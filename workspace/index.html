@@ -17,6 +17,7 @@
 
 <script>
     const padLength = 9;
+    let editMode = false;
 
     function pad(num, size) {
         num = num.toString();
@@ -34,21 +35,21 @@
 
         if (event.data.type === "setEditMode") {
             console.log('setEditMode', event.data.payload);
-        }
-
-        if (event.data.type !== "updateUrl") {
+            editMode = event.data.payload;
             return;
         }
 
-        const data = event.data;
-        // console.log("Message received from iframe:", data);
-        const queryString = event.data.payload;
-        // console.log('queryString: ' + queryString);
-        const indexPadded = pad(queryString.split('%index%')[0], padLength);
-        // console.log('indexPadded: ' + indexPadded);
-        const qsValue = queryString.split('%index%')[1];
-        // console.log('qsValue: ' + qsValue);
-        updateUrl(indexPadded + 'iframequery', qsValue);
+        if (event.data.type === "updateUrl") {
+            const data = event.data;
+            // console.log("Message received from iframe:", data);
+            const queryString = event.data.payload;
+            // console.log('queryString: ' + queryString);
+            const indexPadded = pad(queryString.split('%index%')[0], padLength);
+            // console.log('indexPadded: ' + indexPadded);
+            const qsValue = queryString.split('%index%')[1];
+            // console.log('qsValue: ' + qsValue);
+            updateUrl(indexPadded + 'iframequery', qsValue);
+        }
     });
 
     function getRandomColor() {
