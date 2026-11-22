@@ -12,7 +12,7 @@ test('Medsyntax has title', async ({page}) => {
     // await page.pause();
 });
 
-test('test', async ({page}) => {
+test('Demo query and custom input render combined medsyntax output', async ({page}) => {
     await page.goto(url);
     await page.getByRole('button', {name: 'demo button (click to demo)'}).click();
     await page.getByText('junior', {exact: true}).click();
