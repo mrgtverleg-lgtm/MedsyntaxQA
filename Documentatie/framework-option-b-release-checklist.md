@@ -30,8 +30,8 @@ What the page must do. Tick each item off once you have checked it (see the test
 - [ ] *Query title*, *Copy query*, *Copy link* and *Download* (.txt) work.
 - [ ] *Load example* works where an example exists (PICO, SPIDER, LSI).
 - [ ] *Edit {mnemonic}* and *Save as mnemonic* open the builder. *Cancel* returns to your search without losing text.
-- [ ] *Change framework* goes back to step 1 and carries your text over to matching elements of the new mnemonic.
-- [ ] *Split concept* splits a letter into several named boxes, each combined with AND, OR or NOT within the letter. The full query brackets them as `((a) AND (b))`, and links, *Change framework* and *No framework* keep them.
+- [ ] *Change framework* goes back to step 1. Picking a card there starts a new, empty search (the title stays); *Back to your … search* returns to the old search unchanged.
+- [ ] *Split concept* splits a letter into several named boxes, each combined with AND, OR or NOT within the letter. The full query brackets them as `((a) AND (b))`, and links and *No framework* keep them.
 
 ### Syntax checks (per box)
 - [ ] The 8 original MedsyntaxQA warnings: too many `(` or `)`, too many `[` or `]`, an odd number of quotes, duplicate OR, duplicate AND, ambiguous AND/OR.
@@ -97,7 +97,7 @@ Open http://localhost:8080/framework/ and work through the table.
 | T11 | Type `a AND OR b`, `a OR`, `()`, `x[tiabs]` | Warnings: two operators in a row, operator without a term, empty brackets, unknown PubMed field tag | ☐ |
 | T12 | Fill P and I, exclude C | Full query = `(P) AND (I)`, C left out | ☐ |
 | T13 | Click *Copy link*, open the link in a new tab | Same mnemonic, title and text, opens in step 2 | ☐ |
-| T14 | *Change framework* → PICOS | Your P/I/C/O text is in the matching PICOS boxes | ☐ |
+| T14 | Fill PICO and a title → *Change framework* → SPIDER | All SPIDER boxes are empty and the title is kept. Repeat, but click *Back to your PICO search* instead: your PICO text is still there | ☐ |
 | T15 | *Start without a framework*, add 3 concepts, set one to NOT | Full query uses AND/NOT in the right order | ☐ |
 | T16 | *Save as mnemonic*, reload the page | The mnemonic is under *My mnemonics* | ☐ |
 | T17 | *Copy as JSON*, delete it from *My mnemonics*, *Import JSON…* | The mnemonic is back | ☐ |

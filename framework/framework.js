@@ -200,6 +200,13 @@ function setMnemonic(st, mn) {
   st.values = picks.map(o => (o ? o.v : ''));
   st.subs = picks.map(o => (o ? o.sub : emptySub()));
 }
+// Picking a mnemonic card in step 1 starts a new, empty search: text never moves to another concept.
+// The query title stays, because it describes the question, not the mnemonic.
+function startMnemonic(st, mn) {
+  st.mn = clone(mn);
+  st.values = st.mn.elements.map(() => '');
+  st.subs = st.mn.elements.map(emptySub);
+}
 function compile(st) {
   const parts = [];
   st.mn.elements.forEach((e, i) => {
@@ -827,7 +834,7 @@ function renderApp() {
   renderSteps();
   if (st.step !== 'pick') st.manage = null;
   if (st.step === 'pick') {
-    const hasText = st.values.some(v => v && v.trim());
+    const hasText = st.mn.elements.some((_, i) => conceptsOf(st, i).some(c => c.v.trim()));
     const mine = allMine();
     body.innerHTML = `
       <div class="pick-intro">
@@ -837,7 +844,7 @@ function renderApp() {
           <button type="button" class="btn primary" data-act="free">Start without a framework</button>
           ${hasText ? `<button type="button" class="btn ghost" data-act="back">Back to your ${st.mn.free ? '' : escapeHtml(st.mn.name) + ' '}search</button>` : ''}
         </div>
-        ${hasText ? '<p class="hint">Your text is kept when you switch framework.</p>' : ''}
+        ${hasText ? `<p class="hint">Picking a framework starts a new, empty search. Use <em>Back to your ${st.mn.free ? '' : escapeHtml(st.mn.name) + ' '}search</em> to keep working on this one.</p>` : ''}
       </div>
       <p class="section-label">Library</p>
       <div class="cards">${LIBRARY.map(cardHTML).join('')}</div>
@@ -853,7 +860,7 @@ function renderApp() {
     body.onclick = e => {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.mng) { manageMine(st, b.dataset.mng, b.dataset.mid, body); return; }
-      if (b.dataset.id) { setMnemonic(st, findMn(b.dataset.id)); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
+      if (b.dataset.id) { startMnemonic(st, findMn(b.dataset.id)); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
       if (b.dataset.act === 'back') { st.step = 'edit'; st.panel = null; renderApp(); }
       if (b.dataset.act === 'free') { if (!st.mn.free) startFree(st); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
     };
