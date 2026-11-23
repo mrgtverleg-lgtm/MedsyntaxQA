@@ -16,6 +16,10 @@ Option B ("Start with cards") of the framework design, ready to put in the picom
 
 Scripts load in this order: jQuery 3.6.0 → LZString → `scripts/medsyntax-engine.js` → `framework.js`.
 
+## Before release
+
+See [the release checklist](../Documentatie/framework-option-b-release-checklist.md): requirements, must-fix items, tests and the steps to get this page on GitHub Pages.
+
 ## Put it in the repo
 
 1. Copy the four files into the root of the picomedsyntax repo (or into a subfolder, if it should live next to the current PICO page).
