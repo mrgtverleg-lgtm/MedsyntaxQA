@@ -237,3 +237,21 @@ main { padding-block: 20px 60px; }
 .warn-lead code.sym { font-family: var(--font-code); background: var(--surface-2); color: var(--ink); padding: 0 5px; border-radius: 3px; font-weight: 700; }
 .warn-more { margin-top: 2px; }
 .warn-more summary { cursor: pointer; font-size: .78rem; text-decoration: underline; width: fit-content; }
+
+/* Split concept: more than one concept under one letter (step 2) */
+.cbox { display: grid; gap: 4px; min-width: 0; }
+.cbox.subconcept { margin-left: 18px; padding-left: 10px; border-left: 3px solid var(--el); }
+.sub-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.sub-head .clear-field { margin-left: auto; }
+.sub-name { flex: 1 1 160px; min-width: 0; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.cbox > .sub-name { max-width: 360px; }
+.sub-op { padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink); font-weight: 700; }
+.split-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.split-hint { font-size: .8rem; color: var(--muted); }
+/* In the visualisation: a sub-frame per concept inside the letter frame (frames stay white, like paper) */
+.el-frame .sub-frame { border: 2px dashed var(--el); border-radius: 6px; padding: 0 8px 6px; margin-top: 6px; }
+.el-frame .sub-frame .el-head { margin: 0 -8px 4px; }
+.el-frame .sub-frame .el-badge { font-weight: 600; }
+.el-frame .op-divider.small { font-size: .8rem; padding: 4px 2px 0; color: #1b1f24; }
+.el-frame .op-divider.small.not { color: #8b1d1d; }
+.el-frame .op-divider.small.or { color: #0b6e6a; }

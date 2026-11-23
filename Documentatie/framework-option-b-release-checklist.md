@@ -31,6 +31,7 @@ What the page must do. Tick each item off once you have checked it (see the test
 - [ ] *Load example* works where an example exists (PICO, SPIDER, LSI).
 - [ ] *Edit {mnemonic}* and *Save as mnemonic* open the builder. *Cancel* returns to your search without losing text.
 - [ ] *Change framework* goes back to step 1 and carries your text over to matching elements of the new mnemonic.
+- [ ] *Split concept* splits a letter into several named boxes, each combined with AND, OR or NOT within the letter. The full query brackets them as `((a) AND (b))`, and links, *Change framework* and *No framework* keep them.
 
 ### Syntax checks (per box)
 - [ ] The 8 original MedsyntaxQA warnings: too many `(` or `)`, too many `[` or `]`, an odd number of quotes, duplicate OR, duplicate AND, ambiguous AND/OR.
@@ -107,6 +108,7 @@ Open http://localhost:8080/framework/ and work through the table.
 | T22 | Keyboard only: Tab through step 1 and 2 | Every button and card can be reached and used | ☐ |
 | T23 | Check contrast (e.g. WebAIM contrast checker or browser DevTools) | All text ≥ 4.5:1 | ☐ |
 | T24 | Menu links | *Medsyntax Editor* and *Report an issue* go to this repo | ☐ |
+| T25 | PICO: *Split concept* on P, names "Intensive care patient" / "Heart failure", terms in both; then O split into 3 with OR; then *Copy link* and open it | Full query `((ICU) AND (HF)) AND (I) AND ((o1) OR (o2) OR (o3))`; the visualisation shows one frame per letter with a dashed frame per concept; the link restores names, ops and text | ☐ |
 
 Repeat T1–T13 in **Chrome, Safari, Firefox and Edge**, and T1–T3, T13 and T21 on a real phone.
 

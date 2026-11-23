@@ -97,12 +97,20 @@ function freeMnemonic(n) {
     elements: Array.from({ length: Math.max(1, n) }, (_, i) => concept(i)) };
 }
 // Keep the user's text (and the names of the parts they filled in) when leaving a mnemonic.
+// A split letter becomes one concept block per box, so nothing is lost.
 function startFree(st) {
-  const filled = st.mn.elements.map((e, i) => ({ e, v: st.values[i] || '' })).filter(x => x.v.trim());
+  ensureSubs(st);
+  const filled = [];
+  st.mn.elements.forEach((e, i) => conceptsOf(st, i).forEach(c => {
+    if (!c.v.trim()) return;
+    const label = c.name.trim() || (isSplit(st, i) ? e.label + ' ' + (c.s + 1) : e.label);
+    filled.push({ label, op: c.s ? c.op : e.op, v: c.v });
+  }));
   const mn = freeMnemonic(Math.max(2, filled.length));
-  filled.forEach((x, i) => { mn.elements[i].label = x.e.label; mn.elements[i].op = i ? x.e.op : 'AND'; });
+  filled.forEach((x, i) => { mn.elements[i].label = x.label; mn.elements[i].op = i ? x.op : 'AND'; });
   st.mn = mn;
   st.values = mn.elements.map((_, i) => (filled[i] ? filled[i].v : ''));
+  st.subs = mn.elements.map(emptySub);
 }
 function renumberConcepts(mn) {
   mn.elements.forEach((e, i) => {
@@ -152,34 +160,61 @@ const clone = o => JSON.parse(JSON.stringify(o));
 // =====================================================================
 function newState(id, demo) {
   const mn = clone(findMn(id));
-  return { mn, values: mn.elements.map((_, i) => (demo && demo[i]) || ''), title: '' };
+  return ensureSubs({ mn, values: mn.elements.map((_, i) => (demo && demo[i]) || ''), title: '' });
+}
+// Split concepts: a letter can hold more than one concept (step 2, "Split concept").
+// st.values[i] is the text of the first box; st.subs[i].more holds the extra boxes.
+const emptySub = () => ({ name: '', more: [] });
+function ensureSubs(st) {
+  const old = Array.isArray(st.subs) ? st.subs : [];
+  st.subs = st.mn.elements.map((_, i) => {
+    const x = old[i];
+    if (!x || !Array.isArray(x.more)) return emptySub();
+    return { name: String(x.name || ''), more: x.more.map(m => ({ name: String(m.name || ''), op: ['AND', 'OR', 'NOT'].includes(m.op) ? m.op : 'AND', v: String(m.v || '') })) };
+  });
+  return st;
+}
+const isSplit = (st, i) => !!(st.subs && st.subs[i] && st.subs[i].more.length);
+// Boxes of letter i with their text and op: [{ v, op, name, s }], s = 0 for the first box.
+function conceptsOf(st, i) {
+  const sub = (st.subs && st.subs[i]) || emptySub();
+  return [{ v: st.values[i] || '', op: 'AND', name: sub.name, s: 0 }]
+    .concat(sub.more.map((m, k) => ({ v: m.v, op: m.op, name: m.name, s: k + 1 })));
 }
 // Carry text over: same element (letter + meaning) first, then by position.
 const sameKind = e => (e.key + ':' + String(e.label || '').toLowerCase().split(/[\s\/]/)[0]);
 function setMnemonic(st, mn) {
   mn = clone(mn);
-  const old = st.mn.elements.map((e, i) => ({ kind: sameKind(e), v: st.values[i] || '', used: false }));
-  const vals = mn.elements.map(e => {
-    const hit = old.find(o => !o.used && o.kind === sameKind(e) && o.v);
-    if (hit) { hit.used = true; return hit.v; }
+  ensureSubs(st);
+  // A letter "has text" when any of its boxes has text; its split moves along with it.
+  const old = st.mn.elements.map((e, i) => ({ kind: sameKind(e), v: st.values[i] || '', sub: st.subs[i], used: false,
+    filled: conceptsOf(st, i).some(c => c.v.trim()) }));
+  const picks = mn.elements.map(e => {
+    const hit = old.find(o => !o.used && o.kind === sameKind(e) && o.filled);
+    if (hit) { hit.used = true; return hit; }
     return null;
   });
-  const rest = old.filter(o => !o.used && o.v);
-  for (let i = 0; i < vals.length; i++) if (vals[i] === null) { const r = rest.shift(); vals[i] = r ? (r.used = true, r.v) : ''; }
+  const rest = old.filter(o => !o.used && o.filled);
+  for (let i = 0; i < picks.length; i++) if (picks[i] === null) { const r = rest.shift(); if (r) r.used = true; picks[i] = r || null; }
   st.mn = mn;
-  st.values = vals;
+  st.values = picks.map(o => (o ? o.v : ''));
+  st.subs = picks.map(o => (o ? o.sub : emptySub()));
 }
 function compile(st) {
   const parts = [];
   st.mn.elements.forEach((e, i) => {
-    const v = (st.values[i] || '').trim();
-    if (!e.include || !v) return;
-    parts.push((parts.length ? e.op + ' ' : '') + '(' + v + ')');
+    if (!e.include) return;
+    // Within a letter: ((first) AND (second) OR (third)), skipping empty boxes.
+    const filled = conceptsOf(st, i).filter(c => c.v.trim());
+    if (!filled.length) return;
+    const inner = filled.map((c, k) => (k ? c.op + ' ' : '') + '(' + c.v.trim() + ')').join(' ');
+    parts.push((parts.length ? e.op + ' ' : '') + (filled.length > 1 ? '(' + inner + ')' : inner));
   });
   return parts.join(' ');
 }
 function packState(oid, st) {
   const data = { o: oid, t: st.title, n: st.mn.name, u: st.mn.useFor || '', f: st.mn.free ? 1 : 0, e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
+  if (st.subs && st.subs.some(x => x.more.length || x.name)) data.x = st.subs;
   return LZString.compressToEncodedURIComponent(JSON.stringify(data));
 }
 function unpackState(s) {
@@ -189,7 +224,7 @@ function unpackState(s) {
     const mn = { id: 'shared:' + d.n, name: d.n || 'Shared', useFor: d.u || '', custom: true,
       elements: d.e.map(a => ({ key: a[0], label: a[1], hint: a[2], color: a[3], op: ['AND', 'OR', 'NOT'].includes(a[4]) ? a[4] : 'AND', include: !!a[5] })) };
     if (d.f) { mn.free = true; mn.id = 'none'; }
-    return { oid: d.o, st: { mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '' } };
+    return { oid: d.o, st: ensureSubs({ mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '', subs: d.x }) };
   } catch (e) { return null; }
 }
 function buildLink(oid, st) { return location.href.split(/[?#]/)[0] + '?s=' + packState(oid, st); }
@@ -240,6 +275,41 @@ function fieldHeadHTML(oid, st, e, i) {
           ${n > 1 ? `<button type="button" class="btn icon small" data-remove="${i}" aria-label="Remove concept ${i + 1}">✕</button>` : ''}`;
 }
 
+// The boxes of one letter: the first box, plus the extra boxes once the letter is split (mnemonic mode only).
+function conceptBoxesHTML(oid, st, e, i) {
+  const free = !!st.mn.free, split = !free && isSplit(st, i), sub = st.subs[i];
+  const placeholder = `placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'`;
+  const first = `
+        <div class="cbox" data-s="0">
+          ${split ? `<input type="text" class="sub-name" data-s="0" value="${escapeHtml(sub.name)}" placeholder="Concept 1" aria-label="Name of concept 1 of ${escapeHtml(e.key)}">` : ''}
+          <textarea id="${oid}-v${i}" data-s="0" spellcheck="false" ${free ? `aria-label="Search terms for ${escapeHtml(e.label)}"` : ''} ${placeholder}>${escText(st.values[i] || '')}</textarea>
+          <p class="notice" hidden></p>
+          <ul class="warns" hidden></ul>
+        </div>`;
+  if (free) return first;
+  const more = sub.more.map((m, k) => {
+    const s = k + 1, n = s + 1;
+    return `
+        <div class="cbox subconcept" data-s="${s}">
+          <div class="sub-head">
+            <select class="sub-op" data-s="${s}" aria-label="Combine concept ${n} of ${escapeHtml(e.key)} with">${['AND', 'OR', 'NOT'].map(o => `<option ${m.op === o ? 'selected' : ''}>${o}</option>`).join('')}</select>
+            <input type="text" class="sub-name" data-s="${s}" value="${escapeHtml(m.name)}" placeholder="Concept ${n}" aria-label="Name of concept ${n} of ${escapeHtml(e.key)}">
+            <button type="button" class="btn small ghost clear-field" data-clear="${i}" data-s="${s}" ${m.v.trim() ? '' : 'hidden'} aria-label="Clear concept ${n} of ${escapeHtml(e.key)}">Clear</button>
+            <button type="button" class="btn icon small" data-unsplit="${i}" data-s="${s}" aria-label="Remove concept ${n} of ${escapeHtml(e.key)}">✕</button>
+          </div>
+          <textarea id="${oid}-v${i}-${s}" data-s="${s}" spellcheck="false" aria-label="Search terms for concept ${n} of ${escapeHtml(e.key)}" ${placeholder}>${escText(m.v)}</textarea>
+          <p class="notice" hidden></p>
+          <ul class="warns" hidden></ul>
+        </div>`;
+  }).join('');
+  const btn = `<div class="split-row"><button type="button" class="btn small ghost" data-split="${i}">${split ? '+ Add concept to ' + escapeHtml(e.key) : 'Split concept'}</button>
+          ${split ? '' : '<span class="split-hint">Need two concepts here, like a patient group and a condition?</span>'}</div>`;
+  return first + more + btn;
+}
+// Read and write the text of box s of letter i.
+const getBox = (st, i, s) => (s ? st.subs[i].more[s - 1].v : st.values[i]) || '';
+function setBox(st, i, s, v) { if (s) st.subs[i].more[s - 1].v = v; else st.values[i] = v; }
+
 // The strategy heading shows the query title; without a title it falls back to a generic name.
 function strategyTitle(st) {
   const t = (st.title || '').trim();
@@ -257,12 +327,10 @@ function renderEditor(root, oid, st) {
       <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="${elStyle(e.color)}">
         <div class="field-head${free ? ' free' : ''}">
           ${fieldHeadHTML(oid, st, e, i)}
-          <button type="button" class="btn small ghost clear-field" data-clear="${i}" ${(st.values[i] || '').trim() ? '' : 'hidden'} aria-label="Clear ${escapeHtml(e.label)}">Clear</button>
+          <button type="button" class="btn small ghost clear-field" data-clear="${i}" data-s="0" ${(st.values[i] || '').trim() ? '' : 'hidden'} aria-label="Clear ${escapeHtml(e.label)}">Clear</button>
         </div>
         ${e.hint ? `<p class="hint">${escapeHtml(e.hint)}</p>` : ''}
-        <textarea id="${oid}-v${i}" spellcheck="false" ${free ? `aria-label="Search terms for ${escapeHtml(e.label)}"` : ''} placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'>${escText(st.values[i] || '')}</textarea>
-        <p class="notice" hidden></p>
-        <ul class="warns" hidden></ul>
+        ${conceptBoxesHTML(oid, st, e, i)}
       </div>`).join('')}
       ${free ? '<div class="btn-row"><button type="button" class="btn small" data-act="add-concept">+ Add concept</button></div>' : ''}
     </div>
@@ -293,7 +361,7 @@ function renderEditor(root, oid, st) {
     ta.addEventListener('input', () => {
       grow(ta);
       const i = +ta.closest('.field').dataset.i;
-      st.values[i] = ta.value;
+      setBox(st, i, +ta.dataset.s, ta.value);
       clearTimeout(timer);
       timer = setTimeout(() => refresh(root, oid, st), 120);
     });
@@ -304,13 +372,43 @@ function renderEditor(root, oid, st) {
     syncUrl(oid, st);
   });
   // Clear one box.
+  const boxId = (i, s) => `#${oid}-v${i}` + (s ? '-' + s : '');
   qs(root, '.fields').addEventListener('click', e => {
     const b = e.target.closest('[data-clear]'); if (!b) return;
-    const i = +b.dataset.clear;
-    const ta = qs(root, `#${oid}-v${i}`);
-    st.values[i] = ''; ta.value = ''; grow(ta);
+    const i = +b.dataset.clear, s = +b.dataset.s || 0;
+    const ta = qs(root, boxId(i, s));
+    setBox(st, i, s, ''); ta.value = ''; grow(ta);
     refresh(root, oid, st);
     ta.focus();
+  });
+  // Split a letter into concepts, add one more, or remove one (mnemonic mode).
+  qs(root, '.fields').addEventListener('click', e => {
+    const split = e.target.closest('[data-split]'), un = e.target.closest('[data-unsplit]');
+    if (split) {
+      const i = +split.dataset.split;
+      st.subs[i].more.push({ name: '', op: 'AND', v: '' });
+      renderEditor(root, oid, st);
+      const ta = qs(root, boxId(i, st.subs[i].more.length)); ta && ta.focus();
+    }
+    if (un) {
+      const i = +un.dataset.unsplit, s = +un.dataset.s;
+      st.subs[i].more.splice(s - 1, 1);
+      if (!st.subs[i].more.length) st.subs[i].name = '';
+      renderEditor(root, oid, st);
+    }
+  });
+  // Concept names and AND/OR/NOT within a split letter.
+  qs(root, '.fields').addEventListener('input', e => {
+    const t = e.target; if (!t.classList.contains('sub-name')) return;
+    const i = +t.closest('.field').dataset.i, s = +t.dataset.s;
+    if (s) st.subs[i].more[s - 1].name = t.value; else st.subs[i].name = t.value;
+    clearTimeout(timer);
+    timer = setTimeout(() => refresh(root, oid, st), 200);
+  });
+  qs(root, '.fields').addEventListener('change', e => {
+    const t = e.target; if (!t.classList.contains('sub-op')) return;
+    st.subs[+t.closest('.field').dataset.i].more[+t.dataset.s - 1].op = t.value;
+    refresh(root, oid, st);
   });
   if (free) {
     const fields = qs(root, '.fields');
@@ -331,14 +429,14 @@ function renderEditor(root, oid, st) {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.remove !== undefined) {
         const i = +b.dataset.remove;
-        st.mn.elements.splice(i, 1); st.values.splice(i, 1);
+        st.mn.elements.splice(i, 1); st.values.splice(i, 1); st.subs.splice(i, 1);
         if (st.mn.elements[0]) st.mn.elements[0].op = 'AND';
         renumberConcepts(st.mn);
         renderEditor(root, oid, st);
         updateFwBar(st);
       }
       if (b.dataset.act === 'add-concept') {
-        st.mn.elements.push(concept(st.mn.elements.length)); st.values.push('');
+        st.mn.elements.push(concept(st.mn.elements.length)); st.values.push(''); st.subs.push(emptySub());
         renderEditor(root, oid, st);
         updateFwBar(st);
         const last = qsa(root, '.field textarea').pop(); last && last.focus();
@@ -363,9 +461,10 @@ function renderEditor(root, oid, st) {
       const d = DEMOS[st.mn.name];
       if (!d) return toast('No example for ' + st.mn.name + ' yet. Try PICO, SPIDER or LSI.');
       st.values = st.mn.elements.map((_, i) => d[i] || '');
+      st.subs = st.mn.elements.map(emptySub);
       renderEditor(root, oid, st);
     }
-    if (act === 'clear') { st.values = st.mn.elements.map(() => ''); renderEditor(root, oid, st); }
+    if (act === 'clear') { st.values = st.mn.elements.map(() => ''); st.subs = st.mn.elements.map(emptySub); renderEditor(root, oid, st); }
   });
   refresh(root, oid, st);
 }
@@ -376,53 +475,84 @@ function refresh(root, oid, st) {
   blocks.innerHTML = '';
   const perEl = [];
   let shown = 0;
+  const frameFor = (e, cls, badge) => {
+    const f = document.createElement('div');
+    f.className = cls;
+    f.style.setProperty('--el', e.color);
+    f.style.setProperty('--el-ink', inkFor(e.color));
+    f.innerHTML = `<div class="el-head"><span class="el-badge">${badge}</span><span class="warn-count" hidden></span></div>`;
+    return f;
+  };
+  const divider = (op, small) => {
+    const d = document.createElement('div');
+    d.className = 'op-divider' + (small ? ' small' : '') + (op === 'NOT' ? ' not' : op === 'OR' ? ' or' : '');
+    d.textContent = op;
+    return d;
+  };
+  const showCount = (frame, n) => {
+    if (!frame || !n) return;
+    const wc = qs(frame, ':scope > .el-head .warn-count');
+    wc.textContent = n === 1 ? '1 warning' : n + ' warnings'; wc.hidden = false;
+  };
   st.mn.elements.forEach((e, i) => {
     const field = qs(root, `.field[data-i="${i}"]`);
-    const ta = qs(field, 'textarea');
-    const warnsEl = qs(field, '.warns');
-    qs(field, '.clear-field').hidden = !(st.values[i] || '').trim();
-    const noticeEl = qs(field, '.notice');
-    const raw = st.values[i] || '';
-    if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; perEl.push(null); return; }
-
-    let target;
-    if (e.include) {
-      if (shown > 0) {
-        const d = document.createElement('div');
-        d.className = 'op-divider' + (e.op === 'NOT' ? ' not' : e.op === 'OR' ? ' or' : '');
-        d.textContent = e.op;
-        blocks.appendChild(d);
-      }
-      const frame = document.createElement('div');
-      frame.className = 'el-frame';
-      frame.style.setProperty('--el', e.color);
-      frame.style.setProperty('--el-ink', inkFor(e.color));
-      frame.innerHTML = `<div class="el-head"><span class="el-badge">${escapeHtml(e.key)} · ${escapeHtml(e.label)}</span><span class="warn-count" hidden></span></div><div class="medsyntax"><div class="medsyntax-target" id="${oid}-ms${i}"></div></div>`;
-      blocks.appendChild(frame);
-      target = qs(frame, '.medsyntax-target');
+    const split = isSplit(st, i);
+    const concepts = conceptsOf(st, i);
+    const filled = concepts.filter(c => c.v.trim());
+    let letterFrame = null, inner = 0;
+    if (e.include && filled.length) {
+      if (shown > 0) blocks.appendChild(divider(e.op));
+      letterFrame = frameFor(e, 'el-frame', `${escapeHtml(e.key)} · ${escapeHtml(e.label)}`);
+      blocks.appendChild(letterFrame);
       shown++;
-    } else {
-      target = document.createElement('div');
     }
-    const res = runMedsyntax(raw, target, e.include ? {
-      onCommit: v => { st.values[i] = v; ta.value = v; refresh(root, oid, st); },
-      onCancel: () => refresh(root, oid, st)
-    } : {});
-    perEl.push(res);
+    const warns = new Set();
+    concepts.forEach(c => {
+      const box = qs(field, `.cbox[data-s="${c.s}"]`);
+      const ta = qs(box, 'textarea'), warnsEl = qs(box, ':scope > .warns'), noticeEl = qs(box, ':scope > .notice');
+      const clearBtn = c.s ? qs(box, '.clear-field') : qs(field, '.field-head .clear-field');
+      clearBtn.hidden = !c.v.trim();
+      const raw = c.v;
+      if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; return; }
 
-    if (res.str !== raw) {
-      const pos = ta.selectionStart, active = document.activeElement === ta;
-      ta.value = res.str; st.values[i] = res.str;
-      if (active) { const p = Math.min(pos + (res.str.length - raw.length), res.str.length); ta.setSelectionRange(p, p); }
-    }
-    if (res.notices.length) { noticeEl.textContent = res.notices.join(' '); noticeEl.hidden = false; } else if (!res.notices.length && noticeEl.dataset.keep !== '1') { noticeEl.hidden = true; }
-    if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
-    warnsEl.innerHTML = res.warnings.map(w => `<li><span class="warn-head">${escText(WARN_TEXT[w])}</span>${detailHTML(res.details[w])}</li>`).join('');
-    warnsEl.hidden = !res.warnings.length;
-    if (e.include && res.warnings.length) {
-      const wc = qs(target.closest('.el-frame'), '.warn-count');
-      wc.textContent = res.warnings.length === 1 ? '1 warning' : res.warnings.length + ' warnings'; wc.hidden = false;
-    }
+      // Where the visualisation goes: straight in the letter frame, or in a sub-frame per concept.
+      let target = document.createElement('div'), frame = null;
+      if (letterFrame) {
+        const ms = document.createElement('div');
+        ms.className = 'medsyntax';
+        target = document.createElement('div');
+        target.className = 'medsyntax-target';
+        target.id = `${oid}-ms${i}` + (c.s ? '-' + c.s : '');
+        ms.appendChild(target);
+        if (split) {
+          if (inner > 0) letterFrame.appendChild(divider(c.op, true));
+          frame = frameFor(e, 'sub-frame', escapeHtml(c.name.trim() || 'Concept ' + (c.s + 1)));
+          frame.appendChild(ms);
+          letterFrame.appendChild(frame);
+        } else {
+          frame = letterFrame;
+          letterFrame.appendChild(ms);
+        }
+        inner++;
+      }
+      const res = runMedsyntax(raw, target, letterFrame ? {
+        onCommit: v => { setBox(st, i, c.s, v); ta.value = v; refresh(root, oid, st); },
+        onCancel: () => refresh(root, oid, st)
+      } : {});
+      res.warnings.forEach(w => warns.add(w));
+
+      if (res.str !== raw) {
+        const pos = ta.selectionStart, active = document.activeElement === ta;
+        ta.value = res.str; setBox(st, i, c.s, res.str);
+        if (active) { const p = Math.min(pos + (res.str.length - raw.length), res.str.length); ta.setSelectionRange(p, p); }
+      }
+      if (res.notices.length) { noticeEl.textContent = res.notices.join(' '); noticeEl.hidden = false; } else if (noticeEl.dataset.keep !== '1') { noticeEl.hidden = true; }
+      if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
+      warnsEl.innerHTML = res.warnings.map(w => `<li><span class="warn-head">${escText(WARN_TEXT[w])}</span>${detailHTML(res.details[w])}</li>`).join('');
+      warnsEl.hidden = !res.warnings.length;
+      showCount(frame, res.warnings.length);
+    });
+    perEl.push(filled.length ? { warnings: [...warns] } : null);
   });
   if (!shown) blocks.innerHTML = '<p class="empty">Fill in a box above to see the medsyntax visualisation.</p>';
 
