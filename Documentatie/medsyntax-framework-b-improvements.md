@@ -2,7 +2,7 @@
 
 Review of the current version (option B, "Start with cards", English, without "Help me choose", with a "No framework" option), as of 22 November 2026.
 
-- Code: [medsyntax-framework/](medsyntax-framework/)
+- Code: [medsyntax-framework/](../framework/)
 - Private link: [Medsyntax Framework B](https://claude.ai/artifact/Tb9Xyu9ySWZgzmcgcffhW7)
 - Broader roadmap (syntax esperanto, databases, exports): [medsyntax-framework-todo.md](medsyntax-framework-todo.md)
 

@@ -16,10 +16,10 @@ Status as of 22 November 2026. The design options are in [medsyntax-framework-op
 - [ ] Check the mnemonic library, labels and hints with a librarian colleague. Which ones stay, and which are missing?
 
 ### Port to the repo
-- [x] Strip the prototype down to option B only: remove the A/C tabs, the option intro texts and the code for the dropdown toolbar and the chip sidebar. Done in [medsyntax-framework/](medsyntax-framework/) (22 November 2026).
+- [x] Strip the prototype down to option B only: remove the A/C tabs, the option intro texts and the code for the dropdown toolbar and the chip sidebar. Done in [medsyntax-framework/](../framework/) (22 November 2026).
 - [x] Keep from option A/C what B still needs: the table builder ("Create your own") and Save / Copy as JSON / Import. Added "Edit {mnemonic}" and "Back to your search".
 - [x] Split into `index.html` + `style.css` + `framework.js` + `scripts/medsyntax-engine.js`.
-- [ ] Copy the folder into the picomedsyntax repo and push (see [medsyntax-framework/README.md](medsyntax-framework/README.md)).
+- [ ] Copy the folder into the picomedsyntax repo and push (see [medsyntax-framework/README.md](../framework/README.md)).
 - [ ] Let MedsyntaxQA load the same `scripts/medsyntax-engine.js`, so parser fixes happen in one place instead of in a copy.
 - [ ] Add a way to remove a mnemonic from "My mnemonics" (now only possible by clearing browser data).
 - [ ] Keep the `?query=` / `querytitle=` URL format working, so existing links to MedsyntaxQA still open.
