@@ -275,9 +275,10 @@ function fieldHeadHTML(oid, st, e, i) {
           ${n > 1 ? `<button type="button" class="btn icon small" data-remove="${i}" aria-label="Remove concept ${i + 1}">✕</button>` : ''}`;
 }
 
-// The boxes of one letter: the first box, plus the extra boxes once the letter is split (mnemonic mode only).
+// The boxes of one letter (or one No framework block): the first box, plus the extra boxes once it is split.
 function conceptBoxesHTML(oid, st, e, i) {
-  const free = !!st.mn.free, split = !free && isSplit(st, i), sub = st.subs[i];
+  const free = !!st.mn.free, split = isSplit(st, i), sub = st.subs[i];
+  const who = free ? (e.label || 'concept ' + e.key) : e.key; // what the buttons and labels call this letter or block
   const placeholder = `placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'`;
   const first = `
         <div class="cbox" data-s="0">
@@ -286,7 +287,6 @@ function conceptBoxesHTML(oid, st, e, i) {
           <p class="notice" hidden></p>
           <ul class="warns" hidden></ul>
         </div>`;
-  if (free) return first;
   const more = sub.more.map((m, k) => {
     const s = k + 1, n = s + 1;
     return `
@@ -302,7 +302,7 @@ function conceptBoxesHTML(oid, st, e, i) {
           <ul class="warns" hidden></ul>
         </div>`;
   }).join('');
-  const btn = `<div class="split-row"><button type="button" class="btn small ghost" data-split="${i}">${split ? '+ Add concept to ' + escapeHtml(e.key) : 'Split concept'}</button>
+  const btn = `<div class="split-row"><button type="button" class="btn small ghost" data-split="${i}">${split ? '+ Add concept to ' + escapeHtml(who) : 'Split concept'}</button>
           ${split ? '' : '<span class="split-hint">Need two concepts here, like a patient group and a condition?</span>'}</div>`;
   return first + more + btn;
 }
@@ -381,7 +381,7 @@ function renderEditor(root, oid, st) {
     refresh(root, oid, st);
     ta.focus();
   });
-  // Split a letter into concepts, add one more, or remove one (mnemonic mode).
+  // Split a letter or block into concepts, add one more, or remove one.
   qs(root, '.fields').addEventListener('click', e => {
     const split = e.target.closest('[data-split]'), un = e.target.closest('[data-unsplit]');
     if (split) {
