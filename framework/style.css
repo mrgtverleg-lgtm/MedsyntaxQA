@@ -255,3 +255,12 @@ main { padding-block: 20px 60px; }
 .el-frame .op-divider.small { font-size: .8rem; padding: 4px 2px 0; color: #1b1f24; }
 .el-frame .op-divider.small.not { color: #8b1d1d; }
 .el-frame .op-divider.small.or { color: #0b6e6a; }
+
+/* Optional Medsyntax visualisation (closed by default) */
+.viz { display: grid; gap: 8px; min-width: 0; }
+.viz > summary { cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.viz > summary::-webkit-details-marker { display: none; }
+.viz > summary::before { content: "\25B8"; color: var(--muted); }
+.viz[open] > summary::before { content: "\25BE"; }
+.viz > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.viz[open] > .blocks { margin-top: 8px; }

@@ -317,6 +317,9 @@ function conceptBoxesHTML(oid, st, e, i) {
 const getBox = (st, i, s) => (s ? st.subs[i].more[s - 1].v : st.values[i]) || '';
 function setBox(st, i, s, v) { if (s) st.subs[i].more[s - 1].v = v; else st.values[i] = v; }
 
+const VIZ_KEY = 'medsyntax.showVisualisation';
+function showViz() { try { return localStorage.getItem(VIZ_KEY) === '1'; } catch (e) { return false; } }
+
 // The strategy heading shows the query title; without a title it falls back to a generic name.
 function strategyTitle(st) {
   const t = (st.title || '').trim();
@@ -344,9 +347,11 @@ function renderEditor(root, oid, st) {
     <section class="strategy">
       <div class="strategy-head">
         <h3 class="strategy-title">${escapeHtml(strategyTitle(st))}</h3>
-        <span class="help">Hover a part, click it, edit, press Enter</span>
       </div>
-      <div class="blocks"></div>
+      <details class="viz" ${showViz() ? 'open' : ''}>
+        <summary>Medsyntax visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
+        <div class="blocks"></div>
+      </details>
       <div class="global" aria-live="polite"></div>
       <h4>Full query</h4>
       <div class="full-query"></div>
@@ -361,6 +366,10 @@ function renderEditor(root, oid, st) {
     </section>
   </div>`;
 
+  // The visualisation is optional: closed by default, and the choice is remembered in this browser.
+  qs(root, '.viz').addEventListener('toggle', e => {
+    try { localStorage.setItem(VIZ_KEY, e.target.open ? '1' : '0'); } catch (err) { /* storage blocked */ }
+  });
   let timer;
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 6) + 'px'; };
   qsa(root, '.field textarea').forEach(ta => {
