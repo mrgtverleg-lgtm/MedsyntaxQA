@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Medsyntax Framework</title>
+  <meta name="description" content="Structure your literature search with PICO, SPIDER or your own mnemonic, and check the syntax with Medsyntax.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brandrow">
+        <div class="brand">
+          <span class="brand-mark">medsyntax</span>
+          <div>
+            <h1>Medsyntax Framework</h1>
+            <p>Structure your search with PICO, SPIDER or your own mnemonic</p>
+          </div>
+        </div>
+        <form class="display-toggle" aria-label="Medsyntax display" onsubmit="return false">
+          <label><input type="radio" name="disp" id="disp-colour" value="colour" checked> colour</label>
+          <label><input type="radio" name="disp" id="disp-grey" value="grey"> greyscale</label>
+        </form>
+      </div>
+      <nav class="menu" aria-label="Medsyntax tools">
+        <a href="https://tedoutlook.github.io/medsyntaxqa/">Medsyntax Editor</a>
+        <a href="./" aria-current="page">Medsyntax Framework</a>
+        <a href="https://github.com/tedgrm/medsyntaxexperimental/issues">Report an issue</a>
+      </nav>
+      <ol class="steps" id="steps" aria-label="Steps"></ol>
+    </div>
+  </header>
+
+  <main class="wrap" id="app" aria-live="polite"></main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      Medsyntax · <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPL v3.0</a> · Contact: m.verleg@mzh.nl
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <script src="scripts/medsyntax-engine.js"></script>
+  <script src="framework.js"></script>
+</body>
+</html>

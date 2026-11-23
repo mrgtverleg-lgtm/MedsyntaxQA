@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emtree-termen prototype</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1b1f24;
+  --muted: #5a6370;
+  --border: #d5dae1;
+  --link: #0b57d0;
+  --ok: #18794e;
+  --err: #c62828;
+  --na: #5f6670;
+  --menu-hover: #e8eefb;
+  --term-bg: rgba(11, 87, 208, 0.07);
+  --shadow: 0 6px 24px rgba(16, 24, 40, 0.14);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111418; --surface: #1a1e24; --text: #e6e9ee; --muted: #a3acb8; --border: #343b45;
+    --link: #8ab4f8; --ok: #5cd193; --err: #ff8a80; --na: #a3acb8;
+    --menu-hover: #263248; --term-bg: rgba(138, 180, 248, 0.10); --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111418; --surface: #1a1e24; --text: #e6e9ee; --muted: #a3acb8; --border: #343b45;
+  --link: #8ab4f8; --ok: #5cd193; --err: #ff8a80; --na: #a3acb8;
+  --menu-hover: #263248; --term-bg: rgba(138, 180, 248, 0.10); --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); }
+main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: 14px; }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; flex: 1 1 420px; min-width: 0; }
+.toolbar input[type="text"] {
+  flex: 1; min-width: 0; font: 13px var(--mono); color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+}
+.toolbar .open-q { font-size: 12px; border: 1px dashed var(--na); border-radius: 10px; padding: 1px 8px; white-space: nowrap; }
+
+/* ---------- Editor: textarea + clickable overlay ---------- */
+.editor { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.editor:focus-within { outline: 2px solid var(--link); outline-offset: 1px; }
+.editor textarea, .editor .overlay {
+  margin: 0; border: 0; padding: 14px 22px 14px 16px; width: 100%;
+  font: 15px/2 var(--mono); letter-spacing: 0; tab-size: 4;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal;
+}
+.editor textarea {
+  display: block; resize: none; overflow: hidden; background: transparent;
+  color: transparent; caret-color: var(--text); outline: none; min-height: 120px;
+}
+.editor textarea::selection { background: rgba(11, 87, 208, 0.25); color: transparent; }
+.editor .overlay { position: absolute; inset: 0; pointer-events: none; color: var(--text); }
+.term {
+  pointer-events: auto; cursor: pointer; position: relative; border-radius: 3px;
+  background: var(--term-bg); color: var(--link);
+  text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.term:hover, .term.active { text-decoration: underline solid; text-decoration-thickness: 2px; }
+.term::after {
+  content: ""; position: absolute; right: -0.5em; top: -0.5em; width: 0.6em; height: 0.6em;
+  background: currentColor; opacity: 0.8;
+  -webkit-mask: var(--ext) center / contain no-repeat; mask: var(--ext) center / contain no-repeat;
+}
+.term { --ext: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E"); }
+.term.s-nonembase { color: var(--err); text-decoration-style: wavy; background: none; }
+.term.s-nonembase:hover, .term.s-nonembase.active { text-decoration-style: wavy; }
+.term.s-nonembase::after { display: none; } /* opens no page, so no external-link icon */
+.editor.alt-held .term { pointer-events: none; cursor: text; }
+
+.caret-status { min-height: 24px; margin-top: 8px; font-size: 14px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+kbd {
+  font: 12px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 4px; background: var(--surface); color: var(--text);
+}
+
+/* ---------- Status visuals ---------- */
+.ico { width: 18px; height: 18px; flex: none; }
+.c-embase { color: var(--na); } .c-nonembase { color: var(--err); } .c-ok { color: var(--ok); }
+
+/* ---------- Tooltip ---------- */
+.tip {
+  position: fixed; z-index: 20; max-width: 380px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+  padding: 10px 12px; font-size: 14px; line-height: 1.45; display: none; pointer-events: none;
+}
+.tip.show { display: block; }
+.tip .row { display: flex; gap: 8px; align-items: flex-start; }
+.tip .main { font-weight: 600; }
+.tip .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.tip .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.crab { width: 44px; height: 34px; flex: none; }
+
+/* ---------- Context menu ---------- */
+.menu {
+  position: fixed; z-index: 30; min-width: 240px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 4px; display: none;
+}
+.menu.show { display: block; }
+.menu [role="menuitem"] {
+  display: block; width: 100%; text-align: left; font: 14px var(--sans); color: var(--text);
+  background: none; border: 0; border-radius: 5px; padding: 7px 10px; cursor: pointer;
+}
+.menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus { background: var(--menu-hover); outline: none; }
+.menu .head { font-size: 12px; color: var(--muted); padding: 4px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+
+/* ---------- Notices ---------- */
+.notices { margin-top: 12px; display: grid; gap: 8px; }
+.notice {
+  display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--na); border-radius: 8px; padding: 10px 12px; font-size: 14px;
+}
+.notice.n-nonembase { border-left-color: var(--err); }
+.notice.n-ok { border-left-color: var(--ok); }
+.notice code { font: 13px var(--mono); overflow-wrap: anywhere; }
+.notice .x { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; }
+
+/* ---------- Scenario panel ---------- */
+details.scen { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+details.scen summary { cursor: pointer; font-weight: 600; }
+details.scen ol { margin: 10px 0 4px; padding-left: 22px; }
+details.scen li { margin: 4px 0; }
+details.scen code { font: 13px var(--mono); background: var(--term-bg); padding: 1px 4px; border-radius: 3px; }
+.foot { color: var(--muted); font-size: 13px; margin-top: 16px; }
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  max-width: calc(100vw - 32px);
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Open Emtree-term vanuit zoekterm</h1>
+  <p class="sub">Prototype voor MedSyntax. Emtree-termen in Embase.com-syntax zijn klikbaar en openen de Emtree-zoekpagina in Embase.com. MedSyntax doet zelf geen API-aanroepen.</p>
+
+  <div class="toolbar">
+    <label for="urlTpl">Link naar Emtree-zoekpagina
+      <input type="text" id="urlTpl" spellcheck="false" aria-describedby="urlNote">
+    </label>
+    <span class="open-q" id="urlNote" title="De exacte link volgt uit het technisch ontwerp">Nog open: <code>{term}</code> = label</span>
+  </div>
+
+  <div class="editor" id="editor">
+    <textarea id="input" spellcheck="false" autocomplete="off" aria-label="Zoekstrategie" aria-describedby="caretStatus"></textarea>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+  </div>
+  <div class="caret-status" id="caretStatus" aria-live="polite"></div>
+
+  <div class="notices" id="notices" aria-live="polite"></div>
+
+  <details class="scen" open>
+    <summary>Acceptatiescenario's om te testen</summary>
+    <ol>
+      <li>Klik op <code>heart failure</code> in regel 1: de Emtree-zoekpagina voor "heart failure" opent in een nieuwe tab. De zoekregel blijft ongewijzigd.</li>
+      <li>Niet ingelogd bij Embase.com: Embase.com toont eerst zijn eigen inlogpagina. MedSyntax toont geen "niet gevonden"-melding.</li>
+      <li>Hover over <code>asthma</code> in regel 2: "Wordt gecontroleerd in Embase.com (inloggen vereist)". Er gaat geen API-aanroep uit.</li>
+      <li>Klik op <code>hypertension</code> in regel 3: alleen de pagina voor "hypertension" opent.</li>
+      <li>Klik op de term in <code>'heart failure'/exp/mj</code>: de pagina voor "heart failure" opent.</li>
+      <li><code>heart failure:ti,ab,kw</code> is niet klikbaar.</li>
+      <li>Klik op <code>exp Heart Failure/</code>: geen tab, wel de verdrietige krab met "Dit is geen Embase.com-syntax (Ovid-notatie)".</li>
+      <li>Klik op <code>Heart Failure[Mesh]</code>: dezelfde melding met "(PubMed-notatie)".</li>
+      <li>Open een paar pagina's en controleer daarna dat de tekst en <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Z</kbd> ongewijzigd zijn.</li>
+      <li><kbd>Alt</kbd>/<kbd>⌥</kbd>+klik in een term plaatst de cursor en opent geen tab.</li>
+    </ol>
+    <p class="foot">Toetsenbord: zet de cursor in een term en gebruik <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> om te openen, of <kbd>Shift</kbd>+<kbd>F10</kbd> voor het menu.
+    De link naar de Emtree-zoekpagina is nog open (zie "Nog open" in de requirements). Pas hem bovenaan aan om varianten te proberen. Alleen het label gaat naar Embase.com, nooit de volledige zoekstrategie.
+    Zonder aanhalingstekens herkent het prototype alleen <code>term/exp</code>, <code>term/mj</code> en <code>term/exp/mj</code>. <code>asthma/de</code> zonder aanhalingstekens is ook geldige Ovid-syntax (subheading drug effects) en wordt daarom als Ovid-notatie behandeld. De notatie <code>/mj</code> moet nog worden geverifieerd.</p>
+  </details>
+</main>
+
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="menu" id="menu" role="menu" aria-label="Emtree-acties"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// PARSER-START
+// ---------------------------------------------------------------------------
+// Parser (FR-3). Pure functions, no DOM.
+// Embase.com-syntax is the only dialect that opens a page; other recognised
+// notations (PubMed, Cochrane, Ovid, EBSCO) are clickable but only show a message (FR-10).
+// ---------------------------------------------------------------------------
+function boundaryStart(seg) {
+  let b = 0;
+  const re = /[()\[\]"']|\b(?:and|or|not)\b|^\s*#?\d+\.?(?=\s)/gi;
+  let m;
+  while ((m = re.exec(seg))) b = m.index + m[0].length;
+  return b;
+}
+
+const overlaps = (taken, a, b) => taken.some(([x, y]) => a < y && b > x);
+
+function makeTerm(content, contentStart, extra) {
+  let label = content;
+  const slash = content.indexOf('/');
+  if (slash >= 0 && extra.dialect !== 'Embase.com') label = content.slice(0, slash);
+  const lead = label.length - label.trimStart().length;
+  label = label.trim();
+  if (!label || !/[a-z]/i.test(label)) return null;
+  const start = contentStart + lead;
+  return { start, end: start + label.length, label, explode: !!extra.explode, major: !!extra.major, dialect: extra.dialect };
+}
+
+function embaseFlags(tag) {
+  const t = tag.toLowerCase();
+  return { explode: t.includes('exp'), major: t.includes('mj') };
+}
+
+function parseLine(line, offset = 0) {
+  const terms = [], taken = [];
+  const add = (t, a, b) => { if (t && !overlaps(taken, a, b)) { terms.push(t); taken.push([a, b]); } };
+  let m;
+
+  // Embase.com: 'term'/exp, 'term'/de, 'term'/mj, 'term'/exp/mj
+  const reEmQ = /'([^']+)'\/(exp\/mj|exp|de|mj)(?![a-z])/gi;
+  while ((m = reEmQ.exec(line))) {
+    add(makeTerm(m[1], offset + m.index + 1, { ...embaseFlags(m[2]), dialect: 'Embase.com' }),
+      m.index, m.index + m[0].length);
+  }
+  // Embase.com: term/exp (one word, no quotes). Unquoted term/de is also Ovid (drug effects): left to Ovid.
+  const reEmU = /(^|[\s(])([a-z][a-z0-9-]*)\/(exp\/mj|exp|mj)(?![a-z])/gi;
+  while ((m = reEmU.exec(line))) {
+    const s = m.index + m[1].length;
+    add(makeTerm(m[2], offset + s, { ...embaseFlags(m[3]), dialect: 'Embase.com' }), s, m.index + m[0].length);
+  }
+
+  // Cochrane: [mh "Term"], [mh ^"Term"], [mh Term]
+  const reCoch = /\[mh\s+(\^)?\s*(?:"([^"]*)"|([^\]"]+))\s*\]/gi;
+  while ((m = reCoch.exec(line))) {
+    const content = m[2] !== undefined ? m[2] : m[3];
+    const cStart = m.index + m[0].indexOf(content, 3);
+    add(makeTerm(content, offset + cStart, { explode: true, major: !!m[1], dialect: 'Cochrane' }), m.index, m.index + m[0].length);
+  }
+  // Cochrane: MeSH descriptor: [Term] explode all trees
+  const reCochDesc = /MeSH descriptor:\s*\[([^\]]+)\](\s*explode all trees|\s*this term only)?/gi;
+  while ((m = reCochDesc.exec(line))) {
+    const cStart = m.index + m[0].indexOf('[') + 1;
+    add(makeTerm(m[1], offset + cStart, { explode: !!(m[2] && /explode/i.test(m[2])), dialect: 'Cochrane' }), m.index, m.index + m[0].length);
+  }
+
+  // PubMed: Term[Mesh], "Term"[mh:noexp], "Term/sub"[Majr]
+  const rePub = /\[(mesh terms|mesh major topic|mesh|mh|majr)(:noexp)?\]/gi;
+  while ((m = rePub.exec(line))) {
+    const tagStart = m.index;
+    let i = tagStart;
+    while (i > 0 && line[i - 1] === ' ') i--;
+    let cStart, cEnd;
+    if (line[i - 1] === '"') {
+      const open = line.lastIndexOf('"', i - 2);
+      if (open < 0) continue;
+      cStart = open + 1; cEnd = i - 1;
+    } else { cStart = boundaryStart(line.slice(0, i)); cEnd = i; }
+    const tag = m[1].toLowerCase();
+    add(makeTerm(line.slice(cStart, cEnd), offset + cStart,
+      { explode: !m[2], major: tag === 'majr' || tag === 'mesh major topic', dialect: 'PubMed' }),
+      Math.min(cStart, tagStart), tagStart + m[0].length);
+  }
+
+  // EBSCO: MH "Term", MH "Term+", MM "Term"
+  const reEbscoQ = /(^|[\s(])(MH|MM)\s+"([^"]*?)(\+)?"/gi;
+  const reEbscoU = /(^|[\s(])(MH|MM)\s+([^\s"()][^"()]*?)(\+)?(?=\s+(?:AND|OR|NOT)\b|\s*\)|\s*$)/g;
+  for (const re of [reEbscoQ, reEbscoU]) {
+    while ((m = re.exec(line))) {
+      const s = m.index + m[1].length;
+      const cStart = s + m[0].slice(m[1].length).indexOf(m[3], m[2].length);
+      add(makeTerm(m[3], offset + cStart, { explode: !!m[4], major: m[2].toUpperCase() === 'MM', dialect: 'EBSCO' }),
+        s, m.index + m[0].length);
+    }
+  }
+
+  // Ovid: Term/, exp Term/, *Term/, Term/dt, Term.sh.
+  const ovid = (endIdx, matchEnd) => {
+    const seg = line.slice(0, endIdx);
+    let s = boundaryStart(seg);
+    let raw = seg.slice(s);
+    if (/['"]\s*$/.test(raw)) return;
+    let explode = false, major = false;
+    const pre = raw.match(/^\s*(exp\s+)?(\*)?\s*/i);
+    if (pre) { explode = !!pre[1]; major = !!pre[2]; s += pre[0].length; raw = raw.slice(pre[0].length); }
+    add(makeTerm(raw, offset + s, { explode, major, dialect: 'Ovid' }), s, matchEnd);
+  };
+  const reOvid = /\/([a-z]{2}(?:\s*,\s*[a-z]{2})*)?(?=$|[\s)]|\.(?:\s|$))/gi;
+  while ((m = reOvid.exec(line))) {
+    if (overlaps(taken, m.index, m.index + 1)) continue;
+    ovid(m.index, m.index + m[0].length);
+  }
+  const reSh = /\.sh\./gi;
+  while ((m = reSh.exec(line))) {
+    if (overlaps(taken, m.index, m.index + 1)) continue;
+    ovid(m.index, m.index + m[0].length);
+  }
+
+  return terms.sort((a, b) => a.start - b.start);
+}
+
+function parseText(text) {
+  const out = [];
+  let offset = 0;
+  for (const line of text.split('\n')) { out.push(...parseLine(line, offset)); offset += line.length + 1; }
+  return out;
+}
+
+// FR-2: 'heart failure'/exp, keeping the flags of the original term
+function embaseSyntax(t) {
+  const tag = t.explode && t.major ? 'exp/mj' : t.explode ? 'exp' : t.major ? 'mj' : 'de';
+  return `'${t.label.toLowerCase()}'/${tag}`;
+}
+
+if (typeof module !== 'undefined') module.exports = { parseLine, parseText, embaseSyntax };
+// PARSER-END
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const input = $('input'), overlay = $('overlay'), editor = $('editor');
+const tip = $('tip'), menu = $('menu'), notices = $('notices'), caretStatus = $('caretStatus'), urlTpl = $('urlTpl');
+let terms = [];
+
+// FR-7: exact link still open; {term} is replaced by the URL-encoded label.
+const DEFAULT_TPL = 'https://www.embase.com/emtree?query={term}';
+try { urlTpl.value = localStorage.getItem('emtreeUrlTpl') || DEFAULT_TPL; } catch { urlTpl.value = DEFAULT_TPL; }
+urlTpl.addEventListener('change', () => {
+  if (!urlTpl.value.includes('{term}')) urlTpl.value = DEFAULT_TPL;
+  try { localStorage.setItem('emtreeUrlTpl', urlTpl.value); } catch {}
+});
+const emtreeUrl = label => urlTpl.value.replace('{term}', encodeURIComponent(label.trim().toLowerCase()));
+
+const SAMPLE = [
+  "#1 'heart failure'/exp",
+  "#2 'asthma'/de",
+  "#3 'diabetes mellitus'/exp OR 'hypertension'/exp",
+  "#4 'heart failure'/exp/mj",
+  "#5 asthma/exp AND ('cardiomyopathy'/mj OR 'aged'/exp)",
+  '#6 heart failure:ti,ab,kw',
+  '#7 exp Heart Failure/',
+  '#8 Heart Failure[Mesh]',
+  '#9 MH "Hypertension+" OR [mh "Asthma"]',
+  '#10 #1 AND #3'
+].join('\n');
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const isEmbase = t => t.dialect === 'Embase.com';
+const statusOf = t => (isEmbase(t) ? 'embase' : 'nonembase');
+
+const ICONS = {
+  embase: '<svg class="ico c-embase" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 11v6M12 7.2v.1" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  nonembase: '<svg class="ico c-nonembase" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  ok: '<svg class="ico c-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+const CRAB_SRC = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 68">
+<g stroke="#9c2b1e" stroke-width="3" stroke-linecap="round" fill="none">
+<path d="M22 44l-12 6M22 50l-10 10M66 44l12 6M66 50l10 10M28 54l-4 10M60 54l4 10"/>
+<path d="M30 30L18 16M58 30l12-14"/></g>
+<path d="M10 6c-6 2-8 10-3 14 3 2 8 1 11-2l-4-3 5-2c-1-5-5-8-9-7z" fill="#e0533d" stroke="#9c2b1e" stroke-width="2"/>
+<path d="M78 6c6 2 8 10 3 14-3 2-8 1-11-2l4-3-5-2c1-5 5-8 9-7z" fill="#e0533d" stroke="#9c2b1e" stroke-width="2"/>
+<ellipse cx="44" cy="44" rx="26" ry="16" fill="#e0533d" stroke="#9c2b1e" stroke-width="2.5"/>
+<path d="M36 26v-8M52 26v-8" stroke="#9c2b1e" stroke-width="2.5"/>
+<circle cx="36" cy="16" r="5" fill="#fff" stroke="#9c2b1e" stroke-width="2"/><circle cx="52" cy="16" r="5" fill="#fff" stroke="#9c2b1e" stroke-width="2"/>
+<circle cx="36" cy="17.5" r="2.2" fill="#222"/><circle cx="52" cy="17.5" r="2.2" fill="#222"/>
+<path d="M37 49c4-4 10-4 14 0" stroke="#5b130b" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+<path d="M33 40c0 2-1 4-2 5" stroke="#7fc8ff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+</svg>`);
+const crabImg = () => `<img class="crab" src="${CRAB_SRC}" alt="Verdrietige krab">`;
+
+const statusText = t => (isEmbase(t)
+  ? 'Wordt gecontroleerd in Embase.com (inloggen vereist)'
+  : 'Dit is geen Embase.com-syntax');
+
+function render() {
+  const text = input.value;
+  terms = parseText(text);
+  let html = '', pos = 0;
+  terms.forEach((t, i) => {
+    html += esc(text.slice(pos, t.start));
+    html += `<span class="term s-${statusOf(t)}" data-i="${i}">${esc(text.slice(t.start, t.end))}</span>`;
+    pos = t.end;
+  });
+  overlay.innerHTML = html + esc(text.slice(pos)) + '\n';
+  input.style.height = 'auto';
+  input.style.height = input.scrollHeight + 'px';
+  updateCaretStatus();
+  if (tipTerm != null && terms[tipTerm]) showTip(tipTerm, tipAnchor()); else hideTip();
+}
+
+// ---------- Tooltip (FR-4) ----------
+let tipTerm = null, tipHideTimer = null;
+const spanFor = i => overlay.querySelector(`.term[data-i="${i}"]`);
+const tipAnchor = () => { const s = spanFor(tipTerm); return s ? s.getBoundingClientRect() : null; };
+
+function tipHTML(t) {
+  const st = statusOf(t);
+  let h = `<div class="row">${ICONS[st]}<div><div class="main">${esc(statusText(t))}</div>`;
+  if (st === 'embase') {
+    const flags = [t.explode ? 'explode' : 'geen explode'];
+    if (t.major) flags.push('major focus');
+    h += `<div class="meta">Emtree · ${esc(t.label)} · ${flags.join(' · ')}</div></div></div>`;
+    h += `<div class="hint">Klik om de Emtree-zoekpagina te openen · <kbd>Alt</kbd>/<kbd>⌥</kbd>+klik om te bewerken · rechtsklik voor menu</div>`;
+  } else {
+    h += `<div class="meta">${esc(t.dialect)}-notatie. Er wordt geen pagina geopend.</div></div>${crabImg()}</div>`;
+    h += `<div class="hint">Klik voor de melding · <kbd>Alt</kbd>/<kbd>⌥</kbd>+klik om te bewerken</div>`;
+  }
+  return h;
+}
+
+function showTip(i, rect) {
+  if (!rect) return;
+  const t = terms[i];
+  tipTerm = i;
+  tip.innerHTML = tipHTML(t);
+  tip.setAttribute('aria-label', statusText(t));
+  tip.classList.add('show');
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let top = rect.bottom + 6;
+  if (top + h > window.innerHeight - 8) top = rect.top - h - 6;
+  tip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 12)) + 'px';
+  tip.style.top = Math.max(8, top) + 'px';
+  overlay.querySelectorAll('.term.active').forEach(s => s.classList.remove('active'));
+  const s = spanFor(i); if (s) s.classList.add('active');
+}
+function hideTip() {
+  tipTerm = null; tip.classList.remove('show');
+  overlay.querySelectorAll('.term.active').forEach(s => s.classList.remove('active'));
+}
+
+// NFR-1: hover is instant, no API call
+overlay.addEventListener('mouseover', e => {
+  const s = e.target.closest('.term'); if (!s) return;
+  clearTimeout(tipHideTimer);
+  showTip(+s.dataset.i, s.getBoundingClientRect());
+});
+overlay.addEventListener('mouseout', e => {
+  if (!e.target.closest('.term')) return;
+  tipHideTimer = setTimeout(hideTip, 150);
+});
+
+// ---------- Opening (FR-1, FR-5, FR-7, FR-10) ----------
+function notice(html, cls) {
+  const n = document.createElement('div');
+  n.className = 'notice ' + (cls || '');
+  n.innerHTML = html + '<button class="x" aria-label="Melding sluiten">×</button>';
+  n.querySelector('.x').onclick = () => n.remove();
+  notices.prepend(n);
+  while (notices.children.length > 4) notices.lastChild.remove();
+}
+
+function nonEmbaseNotice(t) {
+  notice(`${crabImg()}<span>${ICONS.nonembase}</span><span><b>${esc(t.label)}</b>: Dit is geen Embase.com-syntax (${esc(t.dialect)}-notatie). Er wordt geen pagina geopend.</span>`, 'n-nonembase');
+}
+
+function openTerm(i) {
+  const t = terms[i];
+  if (!isEmbase(t)) return nonEmbaseNotice(t);
+  const url = emtreeUrl(t.label);
+  // Opened synchronously in the click handler, so the pop-up blocker lets it through (FR-5).
+  window.open(url, '_blank', 'noopener');
+  notice(`${ICONS.ok}<span>Emtree-zoekpagina geopend voor <b>${esc(t.label)}</b>. Log zo nodig in bij Embase.com.<br><code>${esc(url)}</code></span>`, 'n-ok');
+}
+
+function offsetAtPoint(x, y) {
+  let node, off;
+  if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); if (p) { node = p.offsetNode; off = p.offset; } }
+  else if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); if (r) { node = r.startContainer; off = r.startOffset; } }
+  if (!node || !overlay.contains(node)) return null;
+  const walker = document.createTreeWalker(overlay, NodeFilter.SHOW_TEXT);
+  let total = 0, n;
+  while ((n = walker.nextNode())) { if (n === node) return total + off; total += n.length; }
+  return null;
+}
+
+overlay.addEventListener('mousedown', e => {
+  if (!e.target.closest('.term') || e.button !== 0) return;
+  e.preventDefault(); // plain click: textarea caret and focus stay unchanged (NFR-3)
+  if (e.altKey) {     // Alt/Option+click: place the cursor (scenario 10)
+    const off = offsetAtPoint(e.clientX, e.clientY);
+    input.focus();
+    if (off != null) input.setSelectionRange(off, off);
+  }
+});
+overlay.addEventListener('click', e => {
+  const s = e.target.closest('.term'); if (!s || e.altKey) return;
+  e.preventDefault();
+  hideMenu(); hideTip();
+  openTerm(+s.dataset.i);
+});
+
+const setAlt = on => editor.classList.toggle('alt-held', on);
+window.addEventListener('keydown', e => { if (e.key === 'Alt') setAlt(true); });
+window.addEventListener('keyup', e => { if (e.key === 'Alt') setAlt(false); });
+window.addEventListener('blur', () => setAlt(false));
+window.addEventListener('mousemove', e => { if (editor.classList.contains('alt-held') !== e.altKey) setAlt(e.altKey); });
+
+// ---------- Context menu (FR-2) ----------
+let menuTerm = null;
+function showMenu(i, x, y) {
+  const t = terms[i];
+  menuTerm = i;
+  menu.innerHTML = `<div class="head">${esc(t.label)}</div>
+    <button role="menuitem" data-a="open">Open record</button>
+    <button role="menuitem" data-a="copy">Kopieer term</button>
+    <button role="menuitem" data-a="copyem">Kopieer als Embase.com-syntax</button>`;
+  menu.classList.add('show');
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
+  hideTip();
+  menu.querySelector('[role="menuitem"]').focus();
+}
+function hideMenu(restoreFocus) {
+  if (!menu.classList.contains('show')) return;
+  menu.classList.remove('show'); menuTerm = null;
+  if (restoreFocus) input.focus();
+}
+overlay.addEventListener('contextmenu', e => {
+  const s = e.target.closest('.term'); if (!s) return; // elsewhere: normal browser menu
+  e.preventDefault();
+  showMenu(+s.dataset.i, e.clientX, e.clientY);
+});
+
+async function copyText(txt) {
+  const selStart = input.selectionStart, selEnd = input.selectionEnd;
+  try { await navigator.clipboard.writeText(txt); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    input.focus(); input.setSelectionRange(selStart, selEnd);
+  }
+  toast(`Gekopieerd: ${txt}`);
+}
+
+menu.addEventListener('click', e => {
+  const b = e.target.closest('[role="menuitem"]'); if (!b || menuTerm == null) return;
+  const i = menuTerm, t = terms[i];
+  hideMenu(true);
+  switch (b.dataset.a) {
+    case 'open': openTerm(i); break;
+    case 'copy': copyText(t.label); break;
+    case 'copyem': copyText(embaseSyntax(t)); break;
+  }
+});
+menu.addEventListener('keydown', e => {
+  const items = [...menu.querySelectorAll('[role="menuitem"]')];
+  const idx = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
+  else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+  else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+  else if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); hideMenu(true); }
+});
+document.addEventListener('mousedown', e => { if (!menu.contains(e.target)) hideMenu(); });
+window.addEventListener('scroll', () => { hideMenu(); hideTip(); }, true);
+window.addEventListener('resize', () => { hideMenu(); hideTip(); render(); });
+
+// ---------- Keyboard access (NFR-2) ----------
+function termAtCaret() {
+  const p = input.selectionStart;
+  if (p !== input.selectionEnd) return -1;
+  return terms.findIndex(t => p >= t.start && p <= t.end);
+}
+function updateCaretStatus() {
+  if (document.activeElement !== input) { caretStatus.innerHTML = ''; return; }
+  const i = termAtCaret();
+  if (i < 0) { caretStatus.innerHTML = ''; return; }
+  const t = terms[i], st = statusOf(t);
+  caretStatus.innerHTML = `${ICONS[st]}<span><b>${esc(t.label)}</b>: ${esc(statusText(t))}${st === 'nonembase' ? ` (${esc(t.dialect)}-notatie)` : ''}.
+    <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> opent, <kbd>Shift</kbd>+<kbd>F10</kbd> toont het menu.</span>`;
+}
+input.addEventListener('keydown', e => {
+  const i = termAtCaret();
+  if (i < 0) return;
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openTerm(i); }
+  else if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+    e.preventDefault();
+    const r = spanFor(i).getBoundingClientRect();
+    showMenu(i, r.left, r.bottom + 4);
+  }
+});
+input.addEventListener('contextmenu', e => {
+  if (e.button === 0 && e.clientX === 0 && e.clientY === 0 && termAtCaret() >= 0) e.preventDefault();
+});
+document.addEventListener('selectionchange', () => { if (document.activeElement === input) updateCaretStatus(); });
+input.addEventListener('blur', () => setTimeout(updateCaretStatus, 0));
+input.addEventListener('input', () => { render(); hideMenu(); });
+
+let toastTimer;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+input.value = SAMPLE;
+render();
+</script>
+</body>
+</html>

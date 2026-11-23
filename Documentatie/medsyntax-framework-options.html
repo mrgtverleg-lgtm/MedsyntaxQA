@@ -1,0 +1,1411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Medsyntax Framework</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: teal Medsyntax bar, option tabs, then picomedsyntax-style coloured boxes above a "paper" medsyntax strategy panel. */
+:root {
+  --bg: #e6eaea;
+  --surface: #f6f8f8;
+  --surface-2: #ffffff;
+  --ink: #1c2525;
+  --muted: #586867;
+  --line: #c6d0cf;
+  --accent: #127c79;
+  --accent-ink: #ffffff;
+  --accent-soft: #d5ebe9;
+  --peach: #fce7d2;
+  --peach-ink: #3a2816;
+  --warn-bg: #fbe4e4;
+  --warn-ink: #8b1d1d;
+  --warn-line: #e3a5a5;
+  --ok-bg: #e0f1e5;
+  --ok-ink: #1d5c32;
+  --notice-bg: #fff3d4;
+  --notice-ink: #694c00;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* original medsyntax tokens (style.css of MedsyntaxQA) */
+  --color-one-base: orange;
+  --color-one-dark-text: rgb(11, 11, 107);
+  --color-one-light: rgb(255, 231, 183);
+  --color-one-dark: darkorange;
+  --color-gray: grey;
+  --font-sans: Tahoma, Verdana, sans-serif;
+  --font-serif: "Courier New", Courier, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131919; --surface: #1b2322; --surface-2: #222c2b; --ink: #e2eae9; --muted: #9bafad;
+    --line: #34413f; --accent: #3db6b1; --accent-ink: #052120; --accent-soft: #1d3a38;
+    --peach: #3a2a1d; --peach-ink: #f6dbc1; --warn-bg: #3b1d1d; --warn-ink: #f4b4b4; --warn-line: #703636;
+    --ok-bg: #173123; --ok-ink: #a7dcb9; --notice-bg: #3a3118; --notice-ink: #f0d78a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131919; --surface: #1b2322; --surface-2: #222c2b; --ink: #e2eae9; --muted: #9bafad;
+  --line: #34413f; --accent: #3db6b1; --accent-ink: #052120; --accent-soft: #1d3a38;
+  --peach: #3a2a1d; --peach-ink: #f6dbc1; --warn-bg: #3b1d1d; --warn-ink: #f4b4b4; --warn-line: #703636;
+  --ok-bg: #173123; --ok-ink: #a7dcb9; --notice-bg: #3a3118; --notice-ink: #f0d78a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3, h4 { margin: 0; line-height: 1.25; text-wrap: balance; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* top bar */
+.topbar { padding-block: 18px 0; }
+.brandrow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 6px 14px; border-radius: 6px; letter-spacing: .02em; }
+.brand h1 { font-size: 1.25rem; font-weight: 600; }
+.brand p { color: var(--muted); font-size: .9rem; }
+.display-toggle { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; font-size: .85rem; }
+.display-toggle label { padding: 3px 10px; border-radius: 6px; cursor: pointer; }
+.display-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.display-toggle label:has(input:checked) { background: var(--accent-soft); font-weight: 600; }
+.display-toggle label:has(input:focus-visible) { outline: 3px solid var(--accent); }
+
+.tabs { display: flex; gap: 6px; margin-top: 16px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tabs a { display: block; padding: 10px 14px; text-decoration: none; color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; font-weight: 500; }
+.tabs a .tl { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); font-size: .8rem; margin-right: 6px; }
+.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs a[aria-current="page"] .tl { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+main { padding-block: 20px 60px; }
+.opt-intro { color: var(--muted); max-width: 70ch; margin-bottom: 18px; }
+.opt-intro strong { color: var(--ink); }
+
+/* buttons */
+.btn { border: 1px solid var(--line); background: var(--surface-2); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-weight: 500; font-size: .9rem; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 3px 9px; font-size: .82rem; }
+.btn.icon { padding: 3px 8px; min-width: 32px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* toolbar (option A) */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; }
+.toolbar label.inline { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.toolbar select { padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); min-width: 0; max-width: 100%; }
+.toolbar .usefor { color: var(--muted); font-size: .9rem; flex: 1 1 220px; min-width: 0; }
+.letters { display: inline-flex; gap: 3px; vertical-align: middle; }
+.letters span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 4px; background: var(--el); color: #fff; font-weight: 700; font-size: .75rem; }
+
+/* editor */
+.editor { display: grid; gap: 22px; }
+.fields { display: grid; gap: 16px; max-width: 760px; min-width: 0; }
+.title-field { display: grid; gap: 4px; font-weight: 600; font-size: .9rem; }
+.title-field input { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); font-weight: 400; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.field-head label { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 5px; background: var(--el); color: #fff; font-weight: 700; font-size: .85rem; }
+.tag { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.tag.not { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
+.hint { color: var(--muted); font-size: .86rem; }
+.field textarea { width: 100%; min-height: 64px; resize: vertical; padding: 9px 11px; border: 3px solid var(--el); border-radius: 7px; background: var(--surface-2); font-family: var(--font-code); font-size: .88rem; line-height: 1.5; }
+.field.is-off textarea { border-style: dashed; }
+.notice { background: var(--notice-bg); color: var(--notice-ink); padding: 6px 10px; border-radius: 6px; font-size: .85rem; }
+.warns { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.warns li, .global-list li { background: var(--warn-bg); color: var(--warn-ink); border-left: 4px solid var(--warn-ink); padding: 4px 10px; border-radius: 4px; font-size: .85rem; }
+
+.strategy { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 14px; min-width: 0; align-content: start; }
+.strategy-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.strategy h3 { font-size: 1.05rem; }
+.strategy h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.strategy .help { color: var(--muted); font-size: .82rem; }
+.blocks { display: grid; gap: 4px; justify-items: start; overflow-x: auto; }
+.blocks .empty { color: var(--muted); font-style: italic; }
+.op-divider { font-family: var(--font-serif); font-weight: 700; color: var(--ink); padding: 4px 6px; }
+.op-divider.not { color: var(--warn-ink); }
+.el-frame { position: relative; border: 3px solid var(--el); border-radius: 8px; background: #fff; padding: 22px 8px 6px; max-width: 100%; }
+.el-badge { position: absolute; top: -1px; left: -1px; background: var(--el); color: #fff; font-size: .72rem; font-weight: 700; padding: 1px 8px 2px; border-radius: 5px 0 6px 0; font-family: var(--font-ui); }
+.el-frame .warn-count { position: absolute; top: 2px; right: 6px; font-size: .72rem; font-weight: 700; color: #8b1d1d; font-family: var(--font-ui); }
+.edit-msg { color: #8b1d1d; font-size: .8rem; font-family: var(--font-ui); display: block; padding: 2px 4px; }
+.greyscale .blocks { filter: grayscale(100%); }
+
+.global { display: grid; gap: 6px; }
+.global-ok { background: var(--ok-bg); color: var(--ok-ink); padding: 6px 12px; border-radius: 6px; font-size: .88rem; justify-self: start; }
+.global-bad { font-weight: 600; color: var(--warn-ink); font-size: .9rem; }
+.global-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.global-list .letters { margin-left: 6px; }
+.full-query { background: var(--peach); color: var(--peach-ink); padding: 10px 12px; border-radius: 6px; font-family: var(--font-code); font-size: .85rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.full-query.empty { font-family: var(--font-ui); font-style: italic; }
+.link-box input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); font-family: var(--font-code); font-size: .8rem; }
+
+/* builder (table, options A and B) */
+.panel { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; margin-bottom: 18px; }
+.panel h3 { font-size: 1.05rem; }
+.panel .sub { color: var(--muted); font-size: .9rem; }
+.b-top { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.b-top label, .chip-detail label, .side label.blk { display: grid; gap: 3px; font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 0; }
+.b-top input, .b-top select, .brow input, .brow select, .chip-detail input, .chip-detail select, .side select, .side input[type=text], .import textarea {
+  padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-weight: 400; min-width: 0; }
+.b-top .grow { flex: 1 1 220px; }
+.brows { display: grid; gap: 6px; }
+.brow { display: grid; grid-template-columns: 70px minmax(120px, 1.1fr) minmax(140px, 1.6fr) 52px 86px 64px auto; gap: 6px; align-items: center; }
+.brow.head { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.brow input[type=color] { width: 48px; height: 34px; padding: 2px; }
+.brow .inc { display: flex; justify-content: center; }
+.brow .mv { display: flex; gap: 3px; }
+.brow input.k { font-weight: 700; text-align: center; border-left: 5px solid var(--el); }
+.import { display: grid; gap: 6px; }
+.import textarea { min-height: 90px; font-family: var(--font-code); font-size: .8rem; }
+.err { color: var(--warn-ink); font-size: .85rem; }
+@media (max-width: 760px) {
+  .brow { grid-template-columns: 64px 1fr 52px; }
+  .brow.head { display: none; }
+  .brow .h, .brow .op, .brow .inc, .brow .mv { grid-column: span 3; }
+  .brow .inc, .brow .mv { justify-content: flex-start; }
+  .brow { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+}
+
+/* chooser */
+.chooser fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.chooser legend { font-weight: 600; margin-bottom: 6px; }
+.chooser .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.chooser .opts label { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: var(--surface); }
+.chooser .opts label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.rec { border: 2px solid var(--accent); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; background: var(--surface); }
+.rec .rname { font-size: 1.15rem; font-weight: 700; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.rec .why { color: var(--muted); font-size: .9rem; }
+
+/* cards (option B) */
+.pick-intro { display: grid; gap: 10px; margin-bottom: 18px; }
+.pick-intro h2 { font-size: 1.35rem; }
+.pick-intro p { color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.card { text-align: left; display: grid; gap: 8px; align-content: start; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card .cname { font-size: 1.1rem; font-weight: 700; }
+.card .cfull { font-size: .85rem; }
+.card .cuse { font-size: .82rem; color: var(--muted); }
+.card.new { border-style: dashed; place-content: center; text-align: center; color: var(--accent); font-weight: 600; min-height: 120px; }
+.section-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+.fw-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.fw-bar .fwname { font-weight: 700; }
+.fw-bar .usefor { color: var(--muted); font-size: .9rem; flex: 1 1 200px; }
+
+/* option C */
+.c-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; align-items: start; }
+.side { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; position: sticky; top: 12px; }
+.side h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-width: 44px; height: 44px; padding: 0 8px; border-radius: 8px; border: 2px solid transparent; background: var(--el); color: #fff; font-weight: 700; font-size: 1rem; cursor: pointer; }
+.chip.off { opacity: .5; }
+.chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-2) inset; }
+.chip.add { background: transparent; color: var(--accent); border: 2px dashed var(--accent); }
+.chip-detail { display: grid; gap: 8px; padding: 12px; border-radius: 8px; background: var(--surface); border-left: 5px solid var(--el); }
+.chip-detail .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chip-detail .chk { display: flex; gap: 6px; align-items: center; color: var(--ink); font-weight: 500; }
+.c-main .editor { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1180px) {
+  .c-main .editor { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; }
+  .c-main .strategy { position: sticky; top: 12px; }
+}
+@media (max-width: 900px) {
+  .c-layout { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+}
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: .9rem; z-index: 20; max-width: calc(100% - 32px); }
+
+/* ===== Medsyntax visualisation, ported from MedsyntaxQA style.css ===== */
+.medsyntax div { color: black; display: inline-block; margin-bottom: 2px; transition: all 0.2s ease-out; }
+.medsyntax div.search-string { background-color: #fff; padding: 4px; border-radius: 5px; display: inline-block; font-family: var(--font-sans); font-size: 14px; line-height: 1.6; }
+.medsyntax-target div.hover, .medsyntax-target .hover div, .medsyntax-target div.quote-term.hover, .medsyntax-target .hover div.quote-term, .medsyntax-target div.term.hover, .medsyntax-target .hover div.term { background: var(--color-one-base); background-clip: padding-box; }
+.medsyntax div.search-string div.boolean-error-or { color: white; background: darkred; border-style: solid; border-color: darkmagenta; }
+.medsyntax div.search-string.hover div.boolean-error-or, .medsyntax div.search-string div.boolean-error-or.hover, .medsyntax div.search-string .hover div.boolean-error-or { color: black; background: var(--color-one-light); }
+.medsyntax div.search-string div.boolean-error-and { color: white; background: darkblue; border-style: solid; border-color: darkcyan; }
+.medsyntax div.search-string.hover div.boolean-error-and, .medsyntax div.search-string div.boolean-error-and.hover, .medsyntax div.search-string .hover div.boolean-error-and { color: black; background: var(--color-one-light); }
+.medsyntax .term { border-bottom-style: dashed; border-bottom-color: lightgray; border-bottom-width: 1px; margin-left: 5px; }
+.medsyntax-target div.quote-term { background: lightgray; }
+.medsyntax-target .quote-term div.bracket-open, .medsyntax-target .quote-term div.bracket-close { border-color: lightgray; }
+.medsyntax-target .hover div.bracket-open, .medsyntax-target .hover div.bracket-close, .medsyntax-target .quote-term div.bracket-open.hover, .medsyntax-target .quote-term div.bracket-close.hover { border-color: var(--color-one-base); }
+.medsyntax-target div.double-boolean-or, .medsyntax-target div.double-boolean-and, .medsyntax-target div.lonely-bracket-open, .medsyntax-target div.lonely-bracket-close, .medsyntax-target div.lonely-square-bracket-open, .medsyntax-target div.lonely-square-bracket-close { background: darkred; color: white; padding-left: 5px; padding-right: 5px; }
+.medsyntax-target div.boolean { color: var(--color-one-dark-text); padding-left: 5px; padding-right: 5px; font-weight: bold; font-family: var(--font-serif); }
+.medsyntax-target div.brackets { padding: 1px; border-radius: 5px; border: var(--color-one-dark); border-style: solid; border-width: 3px; margin: 3px 3px 3px 3px; filter: hue-rotate(110deg); }
+.medsyntax-target div.square-brackets { padding-right: 2px; font-family: var(--font-sans); color: var(--color-gray); }
+.medsyntax .medsyntax-target .search-string .square-brackets div { border-bottom-style: none; padding: 0px; }
+.medsyntax-target div.near { padding-left: 5px; color: var(--color-gray); font-weight: bold; font-family: var(--font-sans); }
+.medsyntax-target div.embase { font-family: var(--font-sans); color: var(--color-gray); }
+.dynamic-input { font: message-box; background: var(--color-one-light); color: black; border-width: 3px; display: block; width: 100%; min-height: 50px; }
+@media (prefers-reduced-motion: reduce) { .medsyntax div { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="topbar">
+  <div class="wrap">
+    <div class="brandrow">
+      <div class="brand">
+        <span class="brand-mark">medsyntax</span>
+        <div>
+          <h1>Framework search builder</h1>
+          <p>Design options: pick a search mnemonic or make your own</p>
+        </div>
+      </div>
+      <form class="display-toggle" aria-label="Medsyntax display" onsubmit="return false">
+        <label><input type="radio" name="disp" id="disp-colour" value="colour" checked> colour</label>
+        <label><input type="radio" name="disp" id="disp-grey" value="grey"> greyscale</label>
+      </form>
+    </div>
+    <nav class="tabs" aria-label="Design options">
+      <a href="#option-a" data-tab="a"><span class="tl">A</span>Dropdown + create your own</a>
+      <a href="#option-b" data-tab="b"><span class="tl">B</span>Start with cards</a>
+      <a href="#option-c" data-tab="c"><span class="tl">C</span>Builder sidebar</a>
+    </nav>
+  </div>
+</div>
+
+<main class="wrap">
+  <section id="opt-a" data-opt="a" hidden>
+    <p class="opt-intro"><strong>Option A.</strong> The Medsyntax PICO page with a framework dropdown. The last entry, <em>Create your own…</em>, opens a builder above the boxes. The smallest change to the current tool.</p>
+    <div class="a-toolbar"></div>
+    <div class="a-panel"></div>
+    <div class="a-editor"></div>
+  </section>
+  <section id="opt-b" data-opt="b" hidden>
+    <p class="opt-intro"><strong>Option B.</strong> Users first choose a framework from cards, get help choosing, or create their own. Then they fill in the coloured boxes.</p>
+    <div class="b-body"></div>
+  </section>
+  <section id="opt-c" data-opt="c" hidden>
+    <p class="opt-intro"><strong>Option C.</strong> The active mnemonic stays editable in a sidebar: click a letter to rename or recolour it, or press + to add one. Opens with an example custom mnemonic built from your librarian query.</p>
+    <div class="c-layout">
+      <aside class="side c-side" aria-label="Mnemonic builder"></aside>
+      <div class="c-main"></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<script>
+// =====================================================================
+// Medsyntax engine. The block between PARSER START and PARSER END is the
+// MedsyntaxQA parser copied verbatim (regexes + syntaxParser); only the
+// warning hooks write to a collector instead of fixed DOM ids.
+// =====================================================================
+let time = Date.now();
+let latestInputTime = 0;
+let __W = new Set();
+
+// ---- PARSER START ----
+    const quotedTermRe = new RegExp('([\"\'])(?:(?=(\\\\?))\\2.)*?\\1', 'gi');
+    const termRe = new RegExp('(\\\/div>([A-Z].{1,}?)<div)|(\\\/div>( +[A-Z].{1,}?)<div)', 'gi');
+    const termStrayRe = new RegExp('(\\/div>([0-9]{1,}?)\\w+<div)', 'gi');
+    const termStrayExtraRe = new RegExp('(\\/div>([0-9]{1,}?)(.{1,}?)<div)', 'gi');
+    const termStrayNumberRe = new RegExp('(\\/div>([0-9]{1,}?)<div)', 'gi');
+    const termStraySpaceNumberRe = new RegExp('(\\/div>[ ]([0-9]{1,}?)<div)', 'gi');
+    const termStraySpaceNumberSpaceRe = new RegExp('(\\/div>[ ]([0-9]{1,}?)[ ]<div)', 'gi');
+    const termStrayNumberSpaceRe = new RegExp('(\\/div>([0-9]{1,}?)[ ]<div)', 'gi');
+    const andRe = new RegExp('( AND | and )', 'gi');
+    const doubleAndRe = new RegExp('( AND AND | AND and | and AND | and and )', 'gi');
+    const orRe = new RegExp('( OR | or )', 'gi');
+    const doubleOrRe = new RegExp('( OR OR | OR or | or OR | or or )', 'gi');
+    const notRe = new RegExp('( NOT | not )', 'gi');
+    const nearOpRe = new RegExp('(( \\w+[A-Za-z][\/][0-9]+)|( [A-Za-z][\/][0-9]+))', 'gi');
+    const embaseRe = new RegExp('(([\/][A-Za-z])\\w+|([\:][A-Za-z])\\w+|([,][A-Za-z])\\w+|([.][A-Za-z])\\w+)', 'gi');
+    const bracketPairRe = new RegExp('[(][^()]*?[^()\\[]*[)]', 'gm');
+    const squareBracketPairRe = new RegExp('[\\[][^\\[\\]]*?[^\\[\\]]*[\\]]', 'gm');
+
+    const specialColon = str_Random();
+    const specialSlash = str_Random();
+    const specialBracketOpen = str_Random();
+    const specialBracketClose = str_Random();
+    const specialSquareBracketOpen = str_Random();
+    const specialSquareBracketClose = str_Random();
+    const special = "___";
+
+    function str_Random() {
+        const length = 10;
+        let result = '';
+        const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+        // Loop to generate characters for the specified length
+        for (let i = 0; i < length; i++) {
+            const randomInd = Math.floor(Math.random() * characters.length);
+            result += characters.charAt(randomInd);
+        }
+
+        result = '@' + result + '@';
+        return result;
+    }
+
+    function nearOpFunction(x) {
+        x = "<div class=near>" + x + " " + "</div>";
+        x = x.replace(new RegExp('/', 'gi'), specialSlash);
+        return x;
+    }
+
+    function embaseFunction(x) {
+        x = "<div class=embase>" + x + "</div>";
+        return x;
+    }
+
+    function booleanAndFunction(x) {
+        x = "<div class=\"boolean and\">" + x + "</div>";
+        return x;
+    }
+
+    function booleanOrFunction(x) {
+        x = "<div class=\"boolean or\">" + x + "</div>";
+        return x;
+    }
+
+    function doubleBooleanAndFunction(x) {
+        x = x.replace(new RegExp(' ', 'gi'), special);
+        x = "<div class=\"double-boolean-and\">" + x + "</div>";
+        __W.add("double-and");
+        return x;
+    }
+
+    function doubleBooleanOrFunction(x) {
+        x = x.replace(new RegExp(' ', 'gi'), special);
+        x = "<div class=\"double-boolean-or\">" + x + "</div>";
+        __W.add("double-or");
+        return x;
+    }
+
+    function booleanNotFunction(x) {
+        x = "<div class=\"boolean not\">" + x + "</div>";
+        return x;
+    }
+
+    function bracketPairFunction(x) {
+        x = x.replace("(", "<div class=\"brackets\"><div class=\"bracket-open\">(</div>");
+        x = x.replace(")", "<div class=\"bracket-close\">)</div></div>");
+        x = x.replace('(', specialBracketOpen);
+        x = x.replace(')', specialBracketClose);
+        return x;
+    }
+
+    function squareBracketPairFunction(x) {
+        x = x.replace("[", "<div class=\"square-brackets\">[");
+        x = x.replace("]", "]</div>");
+        x = x.replace('[', specialSquareBracketOpen);
+        x = x.replace(']', specialSquareBracketClose);
+        return x;
+    }
+
+    function quotedTermToElement(x) {
+        x = x.replace(new RegExp(' ', 'gi'), special);
+        x = "<div class=quote-term>" + x + "</div>";
+        x = x.replace(new RegExp('/', 'gi'), specialSlash);
+        x = x.replace(new RegExp(':', 'gi'), specialColon);
+        x = x.replace(new RegExp('[(]', 'gi'), specialBracketOpen);
+        x = x.replace(new RegExp('[)]', 'gi'), specialBracketClose);
+        return x;
+    }
+
+    function termReFunction(x) {
+        x = x.replace("<div", "</div><div");
+        x = x.replace("/div>", "/div><div class=\"term\">");
+        return x;
+    }
+
+    function syntaxParser(str) {
+        time = Date.now();
+
+        str = str.replace(quotedTermRe, function (x) {
+            return quotedTermToElement(x);
+        });
+
+        str = str.replace(embaseRe, function (x) {
+            return embaseFunction(x);
+        });
+
+        str = str.replace(nearOpRe, function (x) {
+            return nearOpFunction(x);
+        });
+
+        str = str.replace(doubleAndRe, function (x) {
+            return doubleBooleanAndFunction(x);
+        });
+
+        str = str.replace(doubleOrRe, function (x) {
+            return doubleBooleanOrFunction(x);
+        });
+
+        str = str.replace(andRe, function (x) {
+            return booleanAndFunction(x);
+        });
+
+        str = str.replace(orRe, function (x) {
+            return booleanOrFunction(x);
+        });
+
+        str = str.replace(notRe, function (x) {
+            return booleanNotFunction(x);
+        });
+
+        // brackets
+        let strPreBrackets = "";
+        while (str !== strPreBrackets) {
+            strPreBrackets = str;
+
+            str = str.replaceAll(bracketPairRe, function (x) {
+                return bracketPairFunction(x);
+            });
+
+            str = str.replaceAll(squareBracketPairRe, function (x) {
+                return squareBracketPairFunction(x);
+            });
+        }
+
+        // lonely brackets
+        str = str.replaceAll("(", "<div class=\"lonely-bracket-open\">(</div>");
+        str = str.replaceAll(")", "<div class=\"lonely-bracket-close\">)</div>");
+        str = str.replaceAll("[", "<div class=\"lonely-square-bracket-open\">[</div>");
+        str = str.replaceAll("]", "<div class=\"lonely-square-bracket-close\">]</div>");
+
+        str = str.replace(new RegExp(specialSlash, 'gi'), '/'); //un-special-fy
+        str = str.replace(new RegExp(specialColon, 'gi'), ':'); //un-special-fy
+        str = str.replace(new RegExp(special, 'gi'), ' '); //un-special-fy
+        str = str.replace('class=embase', 'class=\"embase\"'); //un-special-fy embase
+        str = str.replace('</div>.', '</div><div class="embase">.</div>'); //embas "." cleanup
+        str = str.replace('class=quote-term', 'class=\"quote-term\"'); //un-special-fy quote
+        str = str.replace(new RegExp(specialBracketOpen, 'gi'), '('); //un-special-fy
+        str = str.replace(new RegExp(specialBracketClose, 'gi'), ')'); //un-special-fy
+        str = str.replace(new RegExp(specialSquareBracketOpen, 'gi'), '['); //un-special-fy
+        str = str.replace(new RegExp(specialSquareBracketClose, 'gi'), ']'); //un-special-fy
+
+        // make stray words elements
+        str = "<div class=\"search-string\"><div class=\"dummy\"></div>" + str + "<div class=\"dummy\"></div></div>"
+        let strOld = "";
+        while (str !== strOld) {
+            strOld = str;
+            str = str.replace(termRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStrayRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStrayExtraRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStrayNumberRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStraySpaceNumberRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStraySpaceNumberSpaceRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+
+            str = str.replace(termStrayNumberSpaceRe, function (x) {
+                return termReFunction(x);
+            }); //make stray words elements
+        }
+
+        return str;
+    }
+
+// ---- PARSER END ----
+
+const WARN_TEXT = {
+  'bracket-open': 'Too many ( in query. Or not enough ) in query.',
+  'bracket-close': 'Too many ) in query. Or not enough ( in query.',
+  'square-bracket-open': 'Too many [ in query. Or not enough ] in query.',
+  'square-bracket-close': 'Too many ] in query. Or not enough [ in query.',
+  'quotes': 'Incorrect number of quote signs.',
+  'double-or': 'Duplicate OR-operators.',
+  'double-and': 'Duplicate AND-operators.',
+  'ambiguous-and': 'Semantically potentially unclear boolean operator(s). Not fixing these in very long strings may impact medsyntax performance.'
+};
+const WARN_ORDER = Object.keys(WARN_TEXT);
+
+function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function escText(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// Ported from syntaxCheck(): clean-up before parsing.
+function cleanQuery(raw) {
+  const notices = [];
+  let str = raw.replace(/[\u000A\u000D\u2028\u2029]/g, ' ');
+  str = str.replace(/\r?\n|\r/g, ' ');
+  const dq = str.replace(/[“”″‶]/g, '"');
+  if (dq !== str) notices.push('Your input query included one (or some) unexpected types of double quote signs. These quote signs have been replaced with regular double quote signs.');
+  str = dq;
+  const sq = str.replace(/[‘’′‵]/g, '\'');
+  if (sq !== str) notices.push('Your input query included one (or some) unexpected types of single quote signs. These quote signs have been replaced with regular single quote signs.');
+  str = sq;
+  str = str.replaceAll(new RegExp(/AND\(/gi), 'AND (');
+  str = str.replaceAll(new RegExp(/\)AND/gi), ') AND');
+  str = str.replaceAll(new RegExp(/\)OR/gi), ') OR');
+  str = str.replaceAll(new RegExp(/OR\(/gi), 'OR (');
+  str = str.replaceAll(new RegExp(/\)NOT/gi), ') NOT');
+  str = str.replaceAll(new RegExp(/NOT\(/gi), 'NOT (');
+  return { str, notices };
+}
+
+// Ported from syntaxCheck() + afterParseFunction(), scoped to one target element.
+function runMedsyntax(raw, target, opts) {
+  opts = opts || {};
+  __W = new Set();
+  const cleaned = cleanQuery(raw);
+  const str = cleaned.str;
+  let hasError = false;
+  if ((str.match(/"/g) || []).length % 2 !== 0) { __W.add('quotes'); hasError = true; }
+  if ((str.match(/'/g) || []).length % 2 !== 0) { __W.add('quotes'); hasError = true; }
+
+  const html = syntaxParser(escText(str));
+  target.innerHTML = html;
+
+  const bo = (html.match(/\(/g) || []).length, bc = (html.match(/\)/g) || []).length;
+  if (bo > bc) { __W.add('bracket-open'); hasError = true; }
+  if (bo < bc) { __W.add('bracket-close'); hasError = true; }
+  if (html.indexOf('(') > html.indexOf(')')) { __W.add('bracket-close'); __W.add('bracket-open'); }
+  const so = (html.match(/\[/g) || []).length, sc = (html.match(/]/g) || []).length;
+  if (so > sc) { __W.add('square-bracket-open'); hasError = true; }
+  if (so < sc) { __W.add('square-bracket-close'); hasError = true; }
+  if (html.indexOf('[') > html.indexOf(']')) { __W.add('square-bracket-close'); __W.add('square-bracket-open'); }
+
+  if (!hasError) {
+    const $t = $(target);
+    let amb = false;
+    $t.find('.brackets .boolean.and, .search-string .boolean.and').each(function () {
+      if ($(this).siblings('.or').length) { amb = true; return false; }
+    });
+    if (amb) {
+      $t.find('.brackets .boolean.or, .search-string .boolean.or').each(function () { $(this).siblings('.and').addClass('boolean-error-and'); });
+      $t.find('.brackets .boolean.and, .search-string .boolean.and').each(function () { $(this).siblings('.or').addClass('boolean-error-or'); });
+      __W.add('ambiguous-and');
+    }
+  }
+
+  if (opts.onCommit && bo === bc && so === sc && !__W.has('quotes')) attachScopeEditor(target, opts);
+  return { str, notices: cleaned.notices, warnings: WARN_ORDER.filter(k => __W.has(k)) };
+}
+
+// ---- Scope-driven editor (hover, click, edit, Enter), ported and scoped per target ----
+let activeEdit = null;
+function attachScopeEditor(target, opts) {
+  let elementForHover;
+  $(target).find('.search-string div').on('mousemove', function () {
+    if (elementForHover !== this) {
+      if ($(this).hasClass('hover')) return false;
+      makeEditScope(target, this, opts);
+      elementForHover = this;
+    }
+    elementForHover = null;
+    return false;
+  });
+  $(target).on('mouseleave', function () { if (!$(target).find('.dynamic-input').length) $(target).find('div').removeClass('hover').off('mousedown'); });
+}
+function makeEditScope(target, element, opts) {
+  $(target).find('div').removeClass('hover').off('mousedown');
+  if ($(element).parent().hasClass('square-brackets')) element = $(element).parent()[0];
+  const down = e => hoverMouseDown(e, target, opts);
+  if ($(element).hasClass('brackets')) { $(element).addClass('hover').on('mousedown', down); }
+  const walk = (el, dir) => {
+    let $el = $(el);
+    while ($el.length && !$el.hasClass('brackets')) {
+      $el.off('mousedown').addClass('hover').on('mousedown', down);
+      $el = dir === 'next' ? $el.next() : $el.prev();
+    }
+  };
+  walk(element, 'next');
+  walk(element, 'prev');
+}
+function hoverMouseDown(event, target, opts) {
+  event.preventDefault();
+  event.stopPropagation();
+  $(target).find('div').off('mousemove');
+  const $h = $(target).find('.hover');
+  const text = $h.text();
+  $h.wrapAll("<div class='newInputTarget' />");
+  const $ta = $('<textarea class="dynamic-input" aria-label="Edit this part of the query"></textarea>');
+  $(target).find('.newInputTarget').replaceWith($ta);
+  $ta.val(text.trim());
+  const size = () => { $ta[0].style.height = '1px'; $ta[0].style.height = (12 + $ta[0].scrollHeight) + 'px'; };
+  $ta.on('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); onEnterDynamicInput(target, $ta, opts); }
+    if (e.key === 'Escape') { e.preventDefault(); activeEdit = null; opts.onCancel && opts.onCancel(); }
+  }).on('input', size);
+  size();
+  activeEdit = { target, ta: $ta[0], cancel: opts.onCancel };
+  $ta.focus();
+}
+// Same checks as onEnterDynamicInput() in MedsyntaxQA; inline message instead of alert().
+function onEnterDynamicInput(target, $ta, opts) {
+  const node = document.createTextNode(' ' + $ta.val().replace(/\n/g, ' ') + ' ');
+  $ta.replaceWith(node);
+  const str = $(target).text();
+  let err = null;
+  if ((str.match(/"/g) || []).length % 2 !== 0) err = 'number of " error: please fix before pressing Enter';
+  else if ((str.match(/'/g) || []).length % 2 !== 0) err = "number of ' error: please fix before pressing Enter";
+  else {
+    const bo = (str.match(/\(/g) || []).length, bc = (str.match(/\)/g) || []).length;
+    const so = (str.match(/\[/g) || []).length, sc = (str.match(/]/g) || []).length;
+    if (bo !== bc || str.indexOf('(') > str.indexOf(')')) err = '( or ) bracket error: please fix before pressing Enter';
+    else if (so !== sc || str.indexOf('[') > str.indexOf(']')) err = '[ or ] bracket error: please fix before pressing Enter';
+  }
+  if (err) {
+    $(node).replaceWith($ta);
+    $ta.next('.edit-msg').remove();
+    $ta.after('<span class="edit-msg">' + escText(err) + '</span>');
+    $ta.focus();
+    return;
+  }
+  activeEdit = null;
+  opts.onCommit(str.replace(/  +/g, ' ').trim());
+}
+document.addEventListener('mousedown', function (e) {
+  if (activeEdit && !activeEdit.ta.contains(e.target)) { const c = activeEdit.cancel; activeEdit = null; c && c(); }
+}, true);
+
+// =====================================================================
+// Mnemonic library
+// =====================================================================
+const PALETTE = ['#d7263d', '#e88a00', '#5f9e2f', '#7b3fa0', '#1f6fd1', '#00897b', '#c2185b', '#6d4c41', '#455a64', '#e2541b'];
+const col = i => PALETTE[i % PALETTE.length];
+const E = (key, label, hint, i, extra) => Object.assign({ key, label, hint, color: col(i), op: 'AND', include: true }, extra || {});
+
+const LIBRARY = [
+  { id: 'PICO', name: 'PICO', useFor: 'Effects of a treatment, therapy or intervention', elements: [
+    E('P', 'Population/Problem', 'Who are the patients, or what is the problem?', 0),
+    E('I', 'Intervention', 'Which treatment, test or exposure are you studying?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative? Often left out of the search.', 2),
+    E('O', 'Outcome', 'What do you want to measure or improve?', 3)] },
+  { id: 'PICOS', name: 'PICOS', useFor: 'Intervention questions limited to a study design', elements: [
+    E('P', 'Population/Problem', 'Who are the patients, or what is the problem?', 0),
+    E('I', 'Intervention', 'Which treatment or exposure?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative?', 2),
+    E('O', 'Outcome', 'What do you want to measure?', 3),
+    E('S', 'Study design', 'For example randomised controlled trials', 4)] },
+  { id: 'PICOT', name: 'PICOT', useFor: 'Intervention questions with a time frame', elements: [
+    E('P', 'Population/Problem', 'Who are the patients?', 0),
+    E('I', 'Intervention', 'Which treatment or exposure?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative?', 2),
+    E('O', 'Outcome', 'What do you want to measure?', 3),
+    E('T', 'Time', 'Over which period is the outcome measured?', 4)] },
+  { id: 'PEO', name: 'PEO', useFor: 'Qualitative questions, aetiology and risk', elements: [
+    E('P', 'Population', 'Who is involved?', 0),
+    E('E', 'Exposure', 'What are they exposed to or experiencing?', 1),
+    E('O', 'Outcome/Themes', 'Which outcomes or themes are you looking for?', 3)] },
+  { id: 'PECO', name: 'PECO', useFor: 'Environmental and occupational exposures', elements: [
+    E('P', 'Population', 'Who is exposed?', 0),
+    E('E', 'Exposure', 'Which exposure or risk factor?', 1),
+    E('C', 'Comparator', 'Unexposed or differently exposed group', 2),
+    E('O', 'Outcome', 'Which health effect?', 3)] },
+  { id: 'SPIDER', name: 'SPIDER', useFor: 'Qualitative and mixed-methods research', elements: [
+    E('S', 'Sample', 'Which group of people?', 0),
+    E('PI', 'Phenomenon of Interest', 'Which experience, behaviour or decision?', 1),
+    E('D', 'Design', 'For example interviews, focus groups, surveys', 2),
+    E('E', 'Evaluation', 'Views, experiences, attitudes, perceptions', 3),
+    E('R', 'Research type', 'Qualitative, quantitative or mixed methods', 4)] },
+  { id: 'SPICE', name: 'SPICE', useFor: 'Evaluating services, projects and policies', elements: [
+    E('S', 'Setting', 'Where? For example primary care, hospital ward', 0),
+    E('P', 'Perspective', 'For whom? Users, staff, managers', 1),
+    E('I', 'Intervention/Interest', 'What is being done or studied?', 2),
+    E('C', 'Comparison', 'Compared with what?', 3),
+    E('E', 'Evaluation', 'How is success measured?', 4)] },
+  { id: 'ECLIPSE', name: 'ECLIPSE', useFor: 'Health policy and management questions', elements: [
+    E('E', 'Expectation', 'What should the information improve?', 0),
+    E('C', 'Client group', 'Who is the service for?', 1),
+    E('L', 'Location', 'Where is the service?', 2),
+    E('I', 'Impact', 'What would change, and how is it measured?', 3),
+    E('P', 'Professionals', 'Who is involved in delivering it?', 4),
+    E('SE', 'SErvice', 'Which service is it?', 5)] },
+  { id: 'PCC', name: 'PCC', useFor: 'Scoping reviews (JBI)', elements: [
+    E('P', 'Population', 'Which participants?', 0),
+    E('C', 'Concept', 'Which idea, intervention or phenomenon?', 1),
+    E('C', 'Context', 'Which setting, culture or geography?', 2)] },
+  { id: 'PIRD', name: 'PIRD', useFor: 'Diagnostic test accuracy', elements: [
+    E('P', 'Population', 'Which patients are tested?', 0),
+    E('I', 'Index test', 'Which test are you evaluating?', 1),
+    E('R', 'Reference test', 'What is the gold standard?', 2, { include: false }),
+    E('D', 'Diagnosis', 'Which target condition?', 3)] },
+  { id: 'PFO', name: 'PFO', useFor: 'Prognosis and prognostic factors', elements: [
+    E('P', 'Population', 'Which patients?', 0),
+    E('F', 'Prognostic factor', 'Which factor might predict the outcome?', 1),
+    E('O', 'Outcome', 'Which future event?', 3)] },
+  { id: 'CoCoPop', name: 'CoCoPop', useFor: 'Prevalence and incidence', elements: [
+    E('Co', 'Condition', 'Which disease or condition?', 0),
+    E('Co', 'Context', 'Which setting or region?', 1),
+    E('Pop', 'Population', 'Which population?', 2)] },
+  { id: 'CIMO', name: 'CIMO', useFor: 'Management and realist questions: how and why it works', elements: [
+    E('C', 'Context', 'In which situation?', 0),
+    E('I', 'Intervention', 'What is done?', 1),
+    E('M', 'Mechanism', 'Why or how does it work?', 2),
+    E('O', 'Outcome', 'What is the result?', 3)] },
+  { id: 'BeHEMoTh', name: 'BeHEMoTh', useFor: 'Reviews of theories and models', elements: [
+    E('Be', 'Behaviour of interest', 'Which behaviour?', 0),
+    E('H', 'Health context', 'In which health context?', 1),
+    E('E', 'Exclusions', 'What to exclude (combined with NOT)', 6, { op: 'NOT' }),
+    E('MoTh', 'Models or Theories', 'Which models or theories?', 3)] }
+];
+
+const EXAMPLE_CUSTOM = { id: 'my:LSI', name: 'LSI', custom: true, useFor: 'Example custom mnemonic: library instruction', elements: [
+  E('L', 'Librarians', 'Who delivers the instruction?', 5),
+  E('S', 'Setting', 'Which kind of library?', 4),
+  E('I', 'Instruction', 'What kind of teaching or training?', 6)] };
+
+const DEMOS = {
+  PICO: ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR "type 2 diabetes"[tiab] OR T2DM[tiab]',
+         '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab] OR "resistance training"[tiab]',
+         '"usual care"[tiab] OR "standard care"[tiab] OR "no intervention"[tiab]',
+         '"Glycated Hemoglobin"[Mesh] OR HbA1c[tiab] OR "glycemic control"[tiab]'],
+  SPIDER: ['"Nurses"[Mesh] OR nurse*[tiab] OR "nursing staff"[tiab]',
+           '"Patient Handoff"[Mesh] OR handover*[tiab] OR handoff*[tiab] OR SBAR[tiab]',
+           'interview*[tiab] OR "focus group*"[tiab] OR ethnograph*[tiab]',
+           'experienc*[tiab] OR view*[tiab] OR perception*[tiab] OR attitude*[tiab]',
+           '"Qualitative Research"[Mesh] OR qualitative[tiab] OR "mixed method*"[tiab]'],
+  LSI: ['librarian* OR "information specialist" OR informationist* OR "information professional" OR "knowledge worker" OR "information scientist*" OR "information services"',
+        'librar* AND (medical OR academic OR research OR special OR college OR junior )',
+        'DE "library orientation" OR DE "learning" OR DE "information services" OR "User education" OR instruct* OR educat* OR orient* OR teach* OR curricul* OR train* OR pedagog* OR tutor* OR lesson* OR lectur* OR learn * OR webinar*']
+};
+
+// ---- My mnemonics (browser storage, optional) ----
+const STORE_KEY = 'medsyntax.myMnemonics.v1';
+function loadMine() {
+  try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function saveMine(list) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function allMine() {
+  const mine = loadMine();
+  if (!mine.some(m => m.name === EXAMPLE_CUSTOM.name)) mine.unshift(EXAMPLE_CUSTOM);
+  return mine;
+}
+function findMn(id) {
+  return LIBRARY.find(m => m.id === id) || allMine().find(m => m.id === id) || null;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// =====================================================================
+// State
+// =====================================================================
+function newState(id, demo) {
+  const mn = clone(findMn(id));
+  return { mn, values: mn.elements.map((_, i) => (demo && demo[i]) || ''), title: '' };
+}
+// Carry text over: same element (letter + meaning) first, then by position.
+const sameKind = e => (e.key + ':' + String(e.label || '').toLowerCase().split(/[\s\/]/)[0]);
+function setMnemonic(st, mn) {
+  mn = clone(mn);
+  const old = st.mn.elements.map((e, i) => ({ kind: sameKind(e), v: st.values[i] || '', used: false }));
+  const vals = mn.elements.map(e => {
+    const hit = old.find(o => !o.used && o.kind === sameKind(e) && o.v);
+    if (hit) { hit.used = true; return hit.v; }
+    return null;
+  });
+  const rest = old.filter(o => !o.used && o.v);
+  for (let i = 0; i < vals.length; i++) if (vals[i] === null) { const r = rest.shift(); vals[i] = r ? (r.used = true, r.v) : ''; }
+  st.mn = mn;
+  st.values = vals;
+}
+function compile(st) {
+  const parts = [];
+  st.mn.elements.forEach((e, i) => {
+    const v = (st.values[i] || '').trim();
+    if (!e.include || !v) return;
+    parts.push((parts.length ? e.op + ' ' : '') + '(' + v + ')');
+  });
+  return parts.join(' ');
+}
+function packState(oid, st) {
+  const data = { o: oid, t: st.title, n: st.mn.name, u: st.mn.useFor || '', e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
+  return LZString.compressToEncodedURIComponent(JSON.stringify(data));
+}
+function unpackState(s) {
+  try {
+    const d = JSON.parse(LZString.decompressFromEncodedURIComponent(s));
+    if (!d || !Array.isArray(d.e)) return null;
+    const mn = { id: 'shared:' + d.n, name: d.n || 'Shared', useFor: d.u || '', custom: true,
+      elements: d.e.map(a => ({ key: a[0], label: a[1], hint: a[2], color: a[3], op: a[4] === 'NOT' ? 'NOT' : 'AND', include: !!a[5] })) };
+    return { oid: d.o, st: { mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '' } };
+  } catch (e) { return null; }
+}
+function buildLink(oid, st) { return location.href.split(/[?#]/)[0] + '?s=' + packState(oid, st) + '#option-' + oid; }
+
+const S = {
+  a: newState('PICO', DEMOS.PICO),
+  b: Object.assign(newState('PICO'), { step: 'pick', panel: null }),
+  c: Object.assign(newState('my:LSI', DEMOS.LSI), { sel: 0 })
+};
+S.a.panel = null;
+
+// =====================================================================
+// UI helpers
+// =====================================================================
+const qs = (r, s) => r.querySelector(s);
+const qsa = (r, s) => Array.from(r.querySelectorAll(s));
+let toastTimer;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
+function copyText(text, okMsg, fallbackInput) {
+  const fail = () => { if (fallbackInput) { fallbackInput.closest('[hidden]') && (fallbackInput.closest('[hidden]').hidden = false); fallbackInput.value = text; fallbackInput.select(); } toast('Copy was blocked. The text is selected: press Ctrl+C or Cmd+C.'); };
+  try { navigator.clipboard.writeText(text).then(() => toast(okMsg), fail); } catch (e) { fail(); }
+}
+const lettersHTML = mn => '<span class="letters" aria-hidden="true">' + mn.elements.map(e => `<span style="--el:${escapeHtml(e.color)}">${escapeHtml(e.key)}</span>`).join('') + '</span>';
+const fullName = mn => mn.elements.map(e => e.label).join(' · ');
+
+// ---------------- Editor: coloured boxes + medsyntax strategy ----------------
+function renderEditor(root, oid, st) {
+  root.innerHTML = `
+  <div class="editor">
+    <div class="fields">
+      <label class="title-field">Query title<input type="text" id="${oid}-title" value="${escapeHtml(st.title)}" placeholder="Please input a title for your query here..."></label>
+      ${st.mn.elements.map((e, i) => `
+      <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+        <div class="field-head">
+          <label for="${oid}-v${i}"><span class="key">${escapeHtml(e.key)}</span>${escapeHtml(e.label)}</label>
+          ${e.op === 'NOT' ? '<span class="tag not">combined with NOT</span>' : ''}
+          ${e.include ? '' : '<span class="tag">not in search</span>'}
+        </div>
+        ${e.hint ? `<p class="hint">${escapeHtml(e.hint)}</p>` : ''}
+        <textarea id="${oid}-v${i}" spellcheck="false" placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'>${escText(st.values[i] || '')}</textarea>
+        <p class="notice" hidden></p>
+        <ul class="warns" hidden></ul>
+      </div>`).join('')}
+    </div>
+    <section class="strategy">
+      <div class="strategy-head">
+        <h3>Medsyntax ${escapeHtml(st.mn.name)} search strategy</h3>
+        <span class="help">Hover a part, click it, edit, press Enter</span>
+      </div>
+      <div class="blocks"></div>
+      <div class="global" aria-live="polite"></div>
+      <h4>Full query</h4>
+      <div class="full-query"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" data-act="demo">Load example</button>
+        <button type="button" class="btn primary" data-act="copy">Copy query</button>
+        <button type="button" class="btn" data-act="link">Copy link</button>
+        <button type="button" class="btn" data-act="download">Download</button>
+        <button type="button" class="btn ghost" data-act="clear">Clear all</button>
+      </div>
+      <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
+    </section>
+  </div>`;
+
+  let timer;
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 6) + 'px'; };
+  qsa(root, '.field textarea').forEach(ta => {
+    requestAnimationFrame(() => grow(ta));
+    ta.addEventListener('input', () => {
+      grow(ta);
+      const i = +ta.closest('.field').dataset.i;
+      st.values[i] = ta.value;
+      clearTimeout(timer);
+      timer = setTimeout(() => refresh(root, oid, st), 120);
+    });
+  });
+  qs(root, `#${oid}-title`).addEventListener('input', e => { st.title = e.target.value; syncUrl(oid, st); });
+  qs(root, '.strategy .btn-row').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const act = b.dataset.act;
+    const lb = qs(root, `#${oid}-linkbox`);
+    if (act === 'copy') { const q = compile(st); if (!q) return toast('Fill in at least one box first.'); copyText(q, 'Query copied', lb); }
+    if (act === 'link') copyText(buildLink(oid, st), 'Link copied', lb);
+    if (act === 'download') {
+      const q = compile(st); if (!q) return toast('Fill in at least one box first.');
+      const name = (st.title || st.mn.name + ' search').replace(/[^\w\- ]+/g, '').trim() || 'medsyntax';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([(st.title ? st.title + '\n\n' : '') + q + '\n'], { type: 'text/plain' }));
+      a.download = name + '.txt'; document.body.appendChild(a); a.click(); a.remove();
+      toast('Download started. If nothing happens, use Copy query.');
+    }
+    if (act === 'demo') {
+      const d = DEMOS[st.mn.name];
+      if (!d) return toast('No example for ' + st.mn.name + ' yet. Try PICO, SPIDER or LSI.');
+      st.values = st.mn.elements.map((_, i) => d[i] || '');
+      renderEditor(root, oid, st);
+    }
+    if (act === 'clear') { st.values = st.mn.elements.map(() => ''); renderEditor(root, oid, st); }
+  });
+  refresh(root, oid, st);
+}
+
+function refresh(root, oid, st) {
+  latestInputTime = Date.now();
+  const blocks = qs(root, '.blocks');
+  blocks.innerHTML = '';
+  const perEl = [];
+  let shown = 0;
+  st.mn.elements.forEach((e, i) => {
+    const field = qs(root, `.field[data-i="${i}"]`);
+    const ta = qs(field, 'textarea');
+    const warnsEl = qs(field, '.warns');
+    const noticeEl = qs(field, '.notice');
+    const raw = st.values[i] || '';
+    if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; perEl.push(null); return; }
+
+    let target;
+    if (e.include) {
+      if (shown > 0) {
+        const d = document.createElement('div');
+        d.className = 'op-divider' + (e.op === 'NOT' ? ' not' : '');
+        d.textContent = e.op;
+        blocks.appendChild(d);
+      }
+      const frame = document.createElement('div');
+      frame.className = 'el-frame';
+      frame.style.setProperty('--el', e.color);
+      frame.innerHTML = `<span class="el-badge">${escapeHtml(e.key)} · ${escapeHtml(e.label)}</span><span class="warn-count" hidden></span><div class="medsyntax"><div class="medsyntax-target" id="${oid}-ms${i}"></div></div>`;
+      blocks.appendChild(frame);
+      target = qs(frame, '.medsyntax-target');
+      shown++;
+    } else {
+      target = document.createElement('div');
+    }
+    const res = runMedsyntax(raw, target, e.include ? {
+      onCommit: v => { st.values[i] = v; ta.value = v; refresh(root, oid, st); },
+      onCancel: () => refresh(root, oid, st)
+    } : {});
+    perEl.push(res);
+
+    if (res.str !== raw) {
+      const pos = ta.selectionStart, active = document.activeElement === ta;
+      ta.value = res.str; st.values[i] = res.str;
+      if (active) { const p = Math.min(pos + (res.str.length - raw.length), res.str.length); ta.setSelectionRange(p, p); }
+    }
+    if (res.notices.length) { noticeEl.textContent = res.notices.join(' '); noticeEl.hidden = false; } else if (!res.notices.length && noticeEl.dataset.keep !== '1') { noticeEl.hidden = true; }
+    if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
+    warnsEl.innerHTML = res.warnings.map(w => `<li>${escText(WARN_TEXT[w])}</li>`).join('');
+    warnsEl.hidden = !res.warnings.length;
+    if (e.include && res.warnings.length) {
+      const wc = qs(target.closest('.el-frame'), '.warn-count');
+      wc.textContent = res.warnings.length === 1 ? '1 warning' : res.warnings.length + ' warnings'; wc.hidden = false;
+    }
+  });
+  if (!shown) blocks.innerHTML = '<p class="empty">Fill in a box above to see the medsyntax visualisation.</p>';
+
+  // Whole query: same parser, all warnings in one summary.
+  const q = compile(st);
+  const full = qs(root, '.full-query');
+  full.textContent = q || 'The full query will be output here.';
+  full.classList.toggle('empty', !q);
+  const g = qs(root, '.global');
+  if (!q) { g.innerHTML = ''; }
+  else {
+    const gr = runMedsyntax(q, document.createElement('div'));
+    if (!gr.warnings.length) g.innerHTML = '<p class="global-ok">No syntax problems found in the full query</p>';
+    else {
+      g.innerHTML = `<p class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</p>
+        <ul class="global-list">${gr.warnings.map(w => {
+          const where = st.mn.elements.filter((e, i) => perEl[i] && perEl[i].warnings.includes(w));
+          return `<li>${escText(WARN_TEXT[w])}${where.length ? '<span class="letters">' + where.map(e => `<span style="--el:${escapeHtml(e.color)}" title="${escapeHtml(e.label)}">${escapeHtml(e.key)}</span>`).join('') + '</span>' : ''}</li>`;
+        }).join('')}</ul>`;
+    }
+  }
+  syncUrl(oid, st);
+}
+
+let urlTimer;
+function syncUrl(oid, st) {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => { try { history.replaceState(null, '', buildLink(oid, st)); } catch (e) { /* not allowed here */ } }, 400);
+}
+
+// ---------------- Builder (table): options A and B ----------------
+function blankDraft() { return { id: '', name: '', useFor: '', custom: true, elements: [] }; }
+function lettersToElements(txt) {
+  txt = txt.trim();
+  const keys = /[\s,;·]/.test(txt) ? txt.split(/[\s,;·]+/).filter(Boolean) : Array.from(txt);
+  return keys.map((k, i) => E(k.toUpperCase() === k ? k : k, '', '', i));
+}
+function libraryOptions(selected) {
+  const mine = allMine();
+  return `<optgroup label="Library">${LIBRARY.map(m => `<option value="${m.id}" ${m.id === selected ? 'selected' : ''}>${m.name}: ${escapeHtml(m.useFor)}</option>`).join('')}</optgroup>
+    <optgroup label="My mnemonics">${mine.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === selected ? 'selected' : ''}>${escapeHtml(m.name)}${m.useFor ? ': ' + escapeHtml(m.useFor) : ''}</option>`).join('')}</optgroup>`;
+}
+
+function renderBuilder(root, draft, handlers) {
+  const els = draft.elements;
+  root.innerHTML = `
+  <div class="panel builder">
+    <div><h3>${handlers.title || 'Create your own mnemonic'}</h3>
+    <p class="sub">Type the letters of your mnemonic, then say what each letter stands for. Use spaces for parts longer than one letter, for example <code>S PI D E R</code>.</p></div>
+    <div class="b-top">
+      <label class="grow">Letters<input type="text" data-b="letters" placeholder="e.g. PEST or S PI D E R" value=""></label>
+      <button type="button" class="btn" data-act="letters">Make elements</button>
+      <label class="grow">Or start from<select data-b="from"><option value="">Choose a mnemonic…</option>${libraryOptions('')}</select></label>
+    </div>
+    <div class="b-top">
+      <label class="grow">Name<input type="text" data-b="name" value="${escapeHtml(draft.name)}" placeholder="e.g. PEST"></label>
+      <label class="grow">Use for (optional)<input type="text" data-b="useFor" value="${escapeHtml(draft.useFor || '')}" placeholder="e.g. Questions about patient education"></label>
+    </div>
+    <div class="brows">
+      ${els.length ? `<div class="brow head"><span>Letter</span><span>Stands for</span><span>Hint (optional)</span><span>Colour</span><span>Combine</span><span>In search</span><span></span></div>` : '<p class="sub">No elements yet. Type letters above, start from a mnemonic, or add an element.</p>'}
+      ${els.map((e, i) => `
+      <div class="brow" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+        <input class="k" type="text" data-f="key" value="${escapeHtml(e.key)}" aria-label="Letter ${i + 1}">
+        <input type="text" data-f="label" value="${escapeHtml(e.label)}" placeholder="What does ${escapeHtml(e.key || 'this')} stand for?" aria-label="Stands for">
+        <input class="h" type="text" data-f="hint" value="${escapeHtml(e.hint || '')}" placeholder="Question that helps users fill it in" aria-label="Hint">
+        <input type="color" data-f="color" value="${escapeHtml(e.color)}" aria-label="Colour">
+        <select class="op" data-f="op" aria-label="Combine with"><option value="AND" ${e.op === 'AND' ? 'selected' : ''}>AND</option><option value="NOT" ${e.op === 'NOT' ? 'selected' : ''}>NOT</option></select>
+        <label class="inc"><input type="checkbox" data-f="include" ${e.include ? 'checked' : ''} aria-label="Include in search"></label>
+        <span class="mv"><button type="button" class="btn icon small" data-act="up" aria-label="Move up">↑</button><button type="button" class="btn icon small" data-act="down" aria-label="Move down">↓</button><button type="button" class="btn icon small" data-act="del" aria-label="Remove">✕</button></span>
+      </div>`).join('')}
+    </div>
+    <div class="btn-row"><button type="button" class="btn small" data-act="add">+ Add element</button></div>
+    <p class="err" hidden></p>
+    <div class="btn-row">
+      <button type="button" class="btn primary" data-act="use">Use this mnemonic</button>
+      <button type="button" class="btn" data-act="save">Save to My mnemonics</button>
+      <button type="button" class="btn" data-act="json">Copy as JSON</button>
+      <button type="button" class="btn" data-act="import">Import JSON…</button>
+      <button type="button" class="btn ghost" data-act="cancel">Cancel</button>
+    </div>
+    <div class="import" hidden>
+      <label for="imp-${handlers.oid}" class="sub">Paste a mnemonic that a colleague copied as JSON:</label>
+      <textarea id="imp-${handlers.oid}"></textarea>
+      <div class="btn-row"><button type="button" class="btn small" data-act="doimport">Import</button></div>
+    </div>
+  </div>`;
+
+  const err = qs(root, '.err');
+  const showErr = m => { err.textContent = m; err.hidden = !m; };
+  const rerender = () => renderBuilder(root, draft, handlers);
+
+  root.oninput = e => {
+    const t = e.target;
+    if (t.dataset.b === 'name') draft.name = t.value;
+    if (t.dataset.b === 'useFor') draft.useFor = t.value;
+    const row = t.closest('.brow');
+    if (row && t.dataset.f) {
+      const el = draft.elements[+row.dataset.i];
+      if (t.dataset.f === 'include') el.include = t.checked;
+      else el[t.dataset.f] = t.value;
+      if (t.dataset.f === 'color') row.style.setProperty('--el', t.value);
+    }
+  };
+  root.onchange = e => {
+    const t = e.target;
+    if (t.dataset.b === 'from' && t.value) {
+      const m = clone(findMn(t.value));
+      draft.elements = m.elements; draft.name = m.custom ? m.name : m.name + ' (custom)'; draft.useFor = m.useFor; rerender();
+    }
+  };
+  root.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const act = b.dataset.act;
+    const row = b.closest('.brow'); const i = row ? +row.dataset.i : -1;
+    const els = draft.elements;
+    if (act === 'letters') {
+      const txt = qs(root, '[data-b="letters"]').value;
+      if (!txt.trim()) return showErr('Type the letters of your mnemonic first, for example PEST.');
+      draft.elements = lettersToElements(txt);
+      if (!draft.name) draft.name = txt.replace(/[\s,;·]+/g, '');
+      rerender();
+    }
+    if (act === 'add') { els.push(E('', '', '', els.length)); rerender(); }
+    if (act === 'up' && i > 0) { [els[i - 1], els[i]] = [els[i], els[i - 1]]; rerender(); }
+    if (act === 'down' && i < els.length - 1) { [els[i + 1], els[i]] = [els[i], els[i + 1]]; rerender(); }
+    if (act === 'del') { els.splice(i, 1); rerender(); }
+    if (act === 'use' || act === 'save') {
+      const m = finalizeDraft(draft);
+      if (typeof m === 'string') return showErr(m);
+      if (act === 'save') {
+        const list = loadMine().filter(x => x.name !== m.name); list.push(m);
+        toast(saveMine(list) ? m.name + ' saved to My mnemonics in this browser' : 'Could not save in this browser. Use Copy as JSON to keep it.');
+      }
+      handlers.onUse(m);
+    }
+    if (act === 'json') {
+      const m = finalizeDraft(draft);
+      if (typeof m === 'string') return showErr(m);
+      copyText(JSON.stringify(m, null, 2), 'Mnemonic copied as JSON', qs(root, '.import textarea'));
+    }
+    if (act === 'import') { qs(root, '.import').hidden = false; qs(root, '.import textarea').focus(); }
+    if (act === 'doimport') {
+      const m = parseMnemonicJSON(qs(root, '.import textarea').value);
+      if (typeof m === 'string') return showErr(m);
+      Object.assign(draft, m); rerender(); toast('Imported ' + m.name);
+    }
+    if (act === 'cancel') handlers.onCancel();
+  };
+}
+function finalizeDraft(d) {
+  const els = d.elements.map((e, i) => ({ key: (e.key || '').trim(), label: (e.label || '').trim(), hint: (e.hint || '').trim(), color: e.color || col(i), op: e.op === 'NOT' ? 'NOT' : 'AND', include: e.include !== false }));
+  if (!els.length) return 'Add at least one element.';
+  const missing = els.findIndex(e => !e.key);
+  if (missing >= 0) return 'Element ' + (missing + 1) + ' needs a letter.';
+  els.forEach(e => { if (!e.label) e.label = e.key; });
+  const name = (d.name || els.map(e => e.key).join('')).trim();
+  return { id: 'my:' + name, name, useFor: (d.useFor || '').trim(), custom: true, elements: els };
+}
+function parseMnemonicJSON(txt) {
+  try {
+    const o = JSON.parse(txt);
+    if (!o || !Array.isArray(o.elements) || !o.elements.length) return 'This JSON has no "elements" list.';
+    const m = finalizeDraft({ name: o.name, useFor: o.useFor, elements: o.elements.map((e, i) => Object.assign(E('', '', '', i), e)) });
+    return m;
+  } catch (e) { return 'This is not valid JSON. Copy the whole text, including the first { and last }.'; }
+}
+
+// ---------------- Help me choose ----------------
+const CHOOSER = [
+  { v: 'therapy', label: 'The effect of a treatment or intervention', q2: { legend: 'Do you also want to search on…', opts: [
+    { v: 'none', label: 'Nothing extra', rec: 'PICO', why: 'PICO is the standard for intervention questions. Leave Comparison empty if there is no clear alternative.' },
+    { v: 'design', label: 'A study design, such as RCTs', rec: 'PICOS', why: 'PICOS adds S for study design, so you can add a filter for trials.' },
+    { v: 'time', label: 'A time frame', rec: 'PICOT', why: 'PICOT adds T for the period over which the outcome is measured.' }] } },
+  { v: 'diag', label: 'How accurate a test is', rec: 'PIRD', why: 'PIRD separates the index test from the reference test. The reference test is usually left out of the search, so it is switched off by default.' },
+  { v: 'prog', label: 'What predicts an outcome (prognosis)', rec: 'PFO', why: 'PFO focuses on prognostic factors instead of interventions.' },
+  { v: 'expo', label: 'The effect of an exposure or risk factor', q2: { legend: 'Is there a comparison group?', opts: [
+    { v: 'yes', label: 'Yes, an unexposed group', rec: 'PECO', why: 'PECO is used for environmental and occupational health questions with a comparator.' },
+    { v: 'no', label: 'No', rec: 'PEO', why: 'PEO keeps it to population, exposure and outcome.' }] } },
+  { v: 'prev', label: 'How common a condition is', rec: 'CoCoPop', why: 'CoCoPop (condition, context, population) is the JBI format for prevalence and incidence.' },
+  { v: 'qual', label: 'Experiences, views or perceptions', q2: { legend: 'Do you want a broad or a precise search?', opts: [
+    { v: 'broad', label: 'Broad: find more, screen more', rec: 'PEO', why: 'Fewer elements gives a more sensitive search. Methley et al. (2014) found SPIDER more specific but less sensitive than PICO-style searches.' },
+    { v: 'precise', label: 'Precise: fewer, more relevant hits', rec: 'SPIDER', why: 'SPIDER adds design and research type, which makes qualitative searches more specific.' }] } },
+  { v: 'service', label: 'Evaluating a service, project or policy', q2: { legend: 'What fits better?', opts: [
+    { v: 'setting', label: 'A service in a setting, from someone\'s perspective', rec: 'SPICE', why: 'SPICE covers setting, perspective and how the evaluation is measured.' },
+    { v: 'policy', label: 'Health management or policy', rec: 'ECLIPSE', why: 'ECLIPSE was designed for health policy and management questions.' }] } },
+  { v: 'scope', label: 'Mapping a topic (scoping review)', rec: 'PCC', why: 'PCC (population, concept, context) is recommended by JBI for scoping reviews.' },
+  { v: 'how', label: 'How and why something works in a context', rec: 'CIMO', why: 'CIMO adds the mechanism, which suits realist and management questions.' },
+  { v: 'theory', label: 'Theories or models of behaviour', rec: 'BeHEMoTh', why: 'BeHEMoTh searches for models and theories, with an exclusions element combined with NOT.' }
+];
+function renderChooser(root, handlers) {
+  const s = { q1: null, q2: null };
+  const draw = () => {
+    const c1 = CHOOSER.find(c => c.v === s.q1);
+    const c2 = c1 && c1.q2 ? c1.q2.opts.find(o => o.v === s.q2) : null;
+    const result = c1 && !c1.q2 ? c1 : c2;
+    const recMn = result ? findMn(result.rec) : null;
+    root.innerHTML = `
+    <div class="panel chooser">
+      <div><h3>Help me choose a framework</h3><p class="sub">Answer one or two questions. You can always switch afterwards; your text is kept.</p></div>
+      <fieldset><legend>1. What is your question about?</legend><div class="opts">
+        ${CHOOSER.map(c => `<label><input type="radio" name="${handlers.oid}-q1" value="${c.v}" ${s.q1 === c.v ? 'checked' : ''}> ${escText(c.label)}</label>`).join('')}
+      </div></fieldset>
+      ${c1 && c1.q2 ? `<fieldset><legend>2. ${escText(c1.q2.legend)}</legend><div class="opts">
+        ${c1.q2.opts.map(o => `<label><input type="radio" name="${handlers.oid}-q2" value="${o.v}" ${s.q2 === o.v ? 'checked' : ''}> ${escText(o.label)}</label>`).join('')}
+      </div></fieldset>` : ''}
+      ${recMn ? `<div class="rec">
+        <div class="rname">We recommend ${escapeHtml(recMn.name)} ${lettersHTML(recMn)}</div>
+        <p>${escText(fullName(recMn))}</p>
+        <p class="why">${escText(result.why)}</p>
+        <div class="btn-row"><button type="button" class="btn primary" data-use="${recMn.id}">Use ${escapeHtml(recMn.name)}</button><button type="button" class="btn ghost" data-act="close">Close</button></div>
+      </div>` : `<div class="btn-row"><button type="button" class="btn ghost" data-act="close">Close</button></div>`}
+    </div>`;
+  };
+  root.onchange = e => {
+    if (e.target.name === handlers.oid + '-q1') { s.q1 = e.target.value; s.q2 = null; draw(); }
+    if (e.target.name === handlers.oid + '-q2') { s.q2 = e.target.value; draw(); }
+  };
+  root.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.use) handlers.onUse(findMn(b.dataset.use));
+    if (b.dataset.act === 'close') handlers.onCancel();
+  };
+  draw();
+}
+
+// =====================================================================
+// Option A: dropdown + create your own
+// =====================================================================
+function renderA() {
+  const sec = document.getElementById('opt-a'), st = S.a;
+  const tb = qs(sec, '.a-toolbar'), panel = qs(sec, '.a-panel'), ed = qs(sec, '.a-editor');
+  tb.innerHTML = `<div class="toolbar">
+    <label class="inline" for="a-fw">Framework</label>
+    <select id="a-fw">${libraryOptions(st.mn.id)}
+      ${st.mn.id && !findMn(st.mn.id) ? `<option value="${escapeHtml(st.mn.id)}" selected>${escapeHtml(st.mn.name)} (shared)</option>` : ''}
+      <option value="__new">+ Create your own…</option><option value="__edit">✎ Edit ${escapeHtml(st.mn.name)}…</option></select>
+    ${lettersHTML(st.mn)}
+    <span class="usefor">${escapeHtml(st.mn.useFor || fullName(st.mn))}</span>
+    <button type="button" class="btn small" data-act="choose">Help me choose</button>
+  </div>`;
+  const sel = qs(tb, '#a-fw');
+  sel.onchange = () => {
+    if (sel.value === '__new') { st.panel = { kind: 'build', draft: blankDraft() }; renderA(); return; }
+    if (sel.value === '__edit') { const d = clone(st.mn); if (!d.custom) d.name = d.name + ' (custom)'; st.panel = { kind: 'build', draft: d, title: 'Edit ' + st.mn.name }; renderA(); return; }
+    setMnemonic(st, findMn(sel.value)); st.panel = null; renderA();
+  };
+  qs(tb, '[data-act="choose"]').onclick = () => { st.panel = { kind: 'choose' }; renderA(); };
+
+  panel.innerHTML = '';
+  const done = m => { if (m) setMnemonic(st, m); st.panel = null; renderA(); };
+  if (st.panel && st.panel.kind === 'build') renderBuilder(panel, st.panel.draft, { oid: 'a', title: st.panel.title, onUse: done, onCancel: () => done(null) });
+  if (st.panel && st.panel.kind === 'choose') renderChooser(panel, { oid: 'a', onUse: done, onCancel: () => done(null) });
+  renderEditor(ed, 'a', st);
+}
+
+// =====================================================================
+// Option B: start screen with cards
+// =====================================================================
+function cardHTML(m) {
+  return `<button type="button" class="card" data-id="${escapeHtml(m.id)}">
+    <span class="cname">${escapeHtml(m.name)}</span>${lettersHTML(m)}
+    <span class="cfull">${escText(fullName(m))}</span>
+    <span class="cuse">${escText(m.useFor || '')}</span></button>`;
+}
+function renderB() {
+  const body = qs(document.getElementById('opt-b'), '.b-body'), st = S.b;
+  if (st.step === 'pick') {
+    body.innerHTML = `
+      <div class="pick-intro">
+        <h2>Which framework fits your question?</h2>
+        <p>A mnemonic splits your question into parts. Each part gets its own box, and Medsyntax combines them into one query.</p>
+        <div class="btn-row"><button type="button" class="btn primary" data-act="choose">Help me choose</button><button type="button" class="btn" data-act="create">Create your own</button></div>
+      </div>
+      <div class="b-panel"></div>
+      <p class="section-label">Library</p>
+      <div class="cards">${LIBRARY.map(cardHTML).join('')}</div>
+      <p class="section-label">My mnemonics</p>
+      <div class="cards">${allMine().map(cardHTML).join('')}<button type="button" class="card new" data-act="create">+ Create your own mnemonic</button></div>`;
+    const panel = qs(body, '.b-panel');
+    const pick = m => { if (m) { setMnemonic(st, m); st.step = 'edit'; } st.panel = null; renderB(); window.scrollTo({ top: 0 }); };
+    if (st.panel === 'choose') renderChooser(panel, { oid: 'b', onUse: pick, onCancel: () => pick(null) });
+    if (st.panel === 'create') renderBuilder(panel, st.draft, { oid: 'b', onUse: pick, onCancel: () => pick(null) });
+    body.onclick = e => {
+      const b = e.target.closest('button'); if (!b || panel.contains(b)) return;
+      if (b.dataset.id) pick(findMn(b.dataset.id));
+      if (b.dataset.act === 'choose') { st.panel = 'choose'; renderB(); }
+      if (b.dataset.act === 'create') { st.panel = 'create'; st.draft = blankDraft(); renderB(); }
+    };
+  } else {
+    body.innerHTML = `
+      <div class="fw-bar">${lettersHTML(st.mn)}<span class="fwname">${escapeHtml(st.mn.name)}</span>
+        <span class="usefor">${escText(st.mn.useFor || fullName(st.mn))}</span>
+        <button type="button" class="btn small" data-act="change">Change framework</button></div>
+      <div class="b-editor"></div>`;
+    body.onclick = e => { const b = e.target.closest('[data-act="change"]'); if (b) { st.step = 'pick'; renderB(); } };
+    renderEditor(qs(body, '.b-editor'), 'b', st);
+  }
+}
+
+// =====================================================================
+// Option C: builder sidebar with letter chips (edits apply live)
+// =====================================================================
+function renderC() {
+  const sec = document.getElementById('opt-c'), st = S.c;
+  const side = qs(sec, '.c-side'), main = qs(sec, '.c-main');
+  if (st.sel >= st.mn.elements.length) st.sel = st.mn.elements.length - 1;
+  const e = st.mn.elements[st.sel];
+  side.innerHTML = `
+    <div style="display:grid;gap:8px">
+      <h3>Start from</h3>
+      <select id="c-lib" aria-label="Start from a mnemonic"><option value="">Choose a mnemonic…</option>${libraryOptions('')}<option value="__blank">Blank: start from scratch</option></select>
+      <button type="button" class="btn small" data-act="choose">Help me choose</button>
+    </div>
+    <div class="c-chooser"></div>
+    <label class="blk">Name<input type="text" id="c-name" value="${escapeHtml(st.mn.name)}"></label>
+    <div style="display:grid;gap:8px">
+      <h3>Letters</h3>
+      <div class="chips">${st.mn.elements.map((x, i) => `<button type="button" class="chip ${x.include ? '' : 'off'}" style="--el:${escapeHtml(x.color)}" data-i="${i}" aria-pressed="${i === st.sel}" title="${escapeHtml(x.label)}">${escapeHtml(x.key || '?')}</button>`).join('')}<button type="button" class="chip add" data-act="add" aria-label="Add a letter">+</button></div>
+    </div>
+    ${e ? `<div class="chip-detail" style="--el:${escapeHtml(e.color)}">
+      <div class="two"><label>Letter<input type="text" data-f="key" value="${escapeHtml(e.key)}"></label><label>Colour<input type="color" data-f="color" value="${escapeHtml(e.color)}"></label></div>
+      <label>Stands for<input type="text" data-f="label" value="${escapeHtml(e.label)}"></label>
+      <label>Hint<input type="text" data-f="hint" value="${escapeHtml(e.hint || '')}" placeholder="Question that helps users"></label>
+      <div class="two"><label>Combine with<select data-f="op"><option ${e.op === 'AND' ? 'selected' : ''}>AND</option><option ${e.op === 'NOT' ? 'selected' : ''}>NOT</option></select></label>
+      <label class="chk" style="align-self:end"><input type="checkbox" data-f="include" ${e.include ? 'checked' : ''}> In search</label></div>
+      <div class="btn-row"><button type="button" class="btn small" data-act="left">← Move</button><button type="button" class="btn small" data-act="right">Move →</button><button type="button" class="btn small" data-act="del">Remove</button></div>
+    </div>` : '<p class="hint">Press + to add your first letter.</p>'}
+    <div class="btn-row">
+      <button type="button" class="btn small" data-act="save">Save to My mnemonics</button>
+      <button type="button" class="btn small" data-act="json">Copy as JSON</button>
+      <button type="button" class="btn small" data-act="import">Import JSON…</button>
+    </div>
+    <div class="import" hidden><label for="c-imp" class="hint">Paste a mnemonic copied as JSON:</label><textarea id="c-imp"></textarea><div class="btn-row"><button type="button" class="btn small" data-act="doimport">Import</button></div><p class="err" hidden></p></div>`;
+
+  const redrawMain = () => renderEditor(main, 'c', st);
+  const chooserBox = qs(side, '.c-chooser');
+  if (st.choosing) renderChooser(chooserBox, { oid: 'c', onUse: m => { st.choosing = false; setMnemonic(st, m); st.sel = 0; renderC(); }, onCancel: () => { st.choosing = false; renderC(); } });
+
+  side.oninput = ev => {
+    const t = ev.target;
+    if (t.id === 'c-name') { st.mn.name = t.value; st.mn.id = 'my:' + t.value; qs(main, '.strategy h3').textContent = 'Medsyntax ' + t.value + ' search strategy'; return; }
+    const f = t.dataset.f; if (!f || !e) return;
+    if (f === 'include') e.include = t.checked; else e[f] = t.value;
+    const chip = qs(side, `.chip[data-i="${st.sel}"]`);
+    chip.textContent = e.key || '?'; chip.style.setProperty('--el', e.color); chip.classList.toggle('off', !e.include); chip.title = e.label;
+    qs(side, '.chip-detail').style.setProperty('--el', e.color);
+    redrawMain();
+  };
+  side.onchange = ev => {
+    if (ev.target.id === 'c-lib' && ev.target.value) {
+      if (ev.target.value === '__blank') { setMnemonic(st, { id: 'my:Custom', name: 'Custom', custom: true, useFor: '', elements: [E('A', 'First part', '', 0)] }); }
+      else setMnemonic(st, findMn(ev.target.value));
+      st.sel = 0; renderC();
+    }
+  };
+  side.onclick = ev => {
+    const b = ev.target.closest('button'); if (!b || chooserBox.contains(b)) return;
+    const els = st.mn.elements, i = st.sel;
+    if (b.dataset.i !== undefined) { st.sel = +b.dataset.i; renderC(); return; }
+    const act = b.dataset.act;
+    if (act === 'choose') { st.choosing = true; renderC(); }
+    if (act === 'add') { els.push(E(String.fromCharCode(65 + els.length % 26), 'New part', '', els.length)); st.values.push(''); st.sel = els.length - 1; renderC(); qs(side, '[data-f="key"]').select(); }
+    if (act === 'left' && i > 0) { [els[i - 1], els[i]] = [els[i], els[i - 1]]; [st.values[i - 1], st.values[i]] = [st.values[i], st.values[i - 1]]; st.sel--; renderC(); }
+    if (act === 'right' && i < els.length - 1) { [els[i + 1], els[i]] = [els[i], els[i + 1]]; [st.values[i + 1], st.values[i]] = [st.values[i], st.values[i + 1]]; st.sel++; renderC(); }
+    if (act === 'del' && els.length > 1) { els.splice(i, 1); st.values.splice(i, 1); renderC(); }
+    if (act === 'save') {
+      const m = finalizeDraft(st.mn); if (typeof m === 'string') return toast(m);
+      const list = loadMine().filter(x => x.name !== m.name); list.push(m);
+      toast(saveMine(list) ? m.name + ' saved to My mnemonics in this browser' : 'Could not save in this browser. Use Copy as JSON to keep it.');
+    }
+    if (act === 'json') { const m = finalizeDraft(st.mn); if (typeof m === 'string') return toast(m); copyText(JSON.stringify(m, null, 2), 'Mnemonic copied as JSON', qs(side, '#c-imp')); }
+    if (act === 'import') { qs(side, '.import').hidden = false; qs(side, '#c-imp').focus(); }
+    if (act === 'doimport') {
+      const m = parseMnemonicJSON(qs(side, '#c-imp').value);
+      const er = qs(side, '.import .err');
+      if (typeof m === 'string') { er.textContent = m; er.hidden = false; return; }
+      setMnemonic(st, m); st.sel = 0; renderC(); toast('Imported ' + m.name);
+    }
+  };
+  redrawMain();
+}
+
+// =====================================================================
+// Tabs, display toggle, shared links
+// =====================================================================
+const RENDER = { a: renderA, b: renderB, c: renderC };
+let current = null;
+function route() {
+  const m = (location.hash || '').match(/^#option-([abc])$/);
+  const oid = m ? m[1] : 'a';
+  if (oid === current) return;
+  current = oid;
+  qsa(document, 'main > section').forEach(s => { s.hidden = s.dataset.opt !== oid; });
+  qsa(document, '.tabs a').forEach(a => a.setAttribute('aria-current', a.dataset.tab === oid ? 'page' : 'false'));
+  RENDER[oid]();
+}
+window.addEventListener('hashchange', route);
+qsa(document, 'input[name="disp"]').forEach(r => r.addEventListener('change', () => {
+  document.body.classList.toggle('greyscale', r.value === 'grey' && r.checked);
+}));
+
+(function boot() {
+  const s = new URLSearchParams(location.search).get('s');
+  if (s) {
+    const u = unpackState(s);
+    if (u && S[u.oid]) {
+      Object.assign(S[u.oid], u.st);
+      if (u.oid === 'b') S.b.step = 'edit';
+      if (u.oid === 'c') S.c.sel = 0;
+      if (!/^#option-/.test(location.hash)) { try { history.replaceState(null, '', location.href.split('#')[0] + '#option-' + u.oid); } catch (e) {} }
+    }
+  }
+  route();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,700 @@
+// Medsyntax Framework: choose or create a search mnemonic, then build the query.
+// Needs jQuery, LZString and scripts/medsyntax-engine.js loaded first.
+// License: GNU GPL v3.0
+
+// =====================================================================
+// Mnemonic library
+// =====================================================================
+const PALETTE = ['#d7263d', '#e88a00', '#5f9e2f', '#7b3fa0', '#1f6fd1', '#00897b', '#c2185b', '#6d4c41', '#455a64', '#e2541b'];
+const col = i => PALETTE[i % PALETTE.length];
+const E = (key, label, hint, i, extra) => Object.assign({ key, label, hint, color: col(i), op: 'AND', include: true }, extra || {});
+
+const LIBRARY = [
+  { id: 'PICO', name: 'PICO', useFor: 'Effects of a treatment, therapy or intervention', elements: [
+    E('P', 'Population/Problem', 'Who are the patients, or what is the problem?', 0),
+    E('I', 'Intervention', 'Which treatment, test or exposure are you studying?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative? Often left out of the search.', 2),
+    E('O', 'Outcome', 'What do you want to measure or improve?', 3)] },
+  { id: 'PICOS', name: 'PICOS', useFor: 'Intervention questions limited to a study design', elements: [
+    E('P', 'Population/Problem', 'Who are the patients, or what is the problem?', 0),
+    E('I', 'Intervention', 'Which treatment or exposure?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative?', 2),
+    E('O', 'Outcome', 'What do you want to measure?', 3),
+    E('S', 'Study design', 'For example randomised controlled trials', 4)] },
+  { id: 'PICOT', name: 'PICOT', useFor: 'Intervention questions with a time frame', elements: [
+    E('P', 'Population/Problem', 'Who are the patients?', 0),
+    E('I', 'Intervention', 'Which treatment or exposure?', 1),
+    E('C', 'Comparison/Control', 'What is the alternative?', 2),
+    E('O', 'Outcome', 'What do you want to measure?', 3),
+    E('T', 'Time', 'Over which period is the outcome measured?', 4)] },
+  { id: 'PEO', name: 'PEO', useFor: 'Qualitative questions, aetiology and risk', elements: [
+    E('P', 'Population', 'Who is involved?', 0),
+    E('E', 'Exposure', 'What are they exposed to or experiencing?', 1),
+    E('O', 'Outcome/Themes', 'Which outcomes or themes are you looking for?', 3)] },
+  { id: 'PECO', name: 'PECO', useFor: 'Environmental and occupational exposures', elements: [
+    E('P', 'Population', 'Who is exposed?', 0),
+    E('E', 'Exposure', 'Which exposure or risk factor?', 1),
+    E('C', 'Comparator', 'Unexposed or differently exposed group', 2),
+    E('O', 'Outcome', 'Which health effect?', 3)] },
+  { id: 'SPIDER', name: 'SPIDER', useFor: 'Qualitative and mixed-methods research', elements: [
+    E('S', 'Sample', 'Which group of people?', 0),
+    E('PI', 'Phenomenon of Interest', 'Which experience, behaviour or decision?', 1),
+    E('D', 'Design', 'For example interviews, focus groups, surveys', 2),
+    E('E', 'Evaluation', 'Views, experiences, attitudes, perceptions', 3),
+    E('R', 'Research type', 'Qualitative, quantitative or mixed methods', 4)] },
+  { id: 'SPICE', name: 'SPICE', useFor: 'Evaluating services, projects and policies', elements: [
+    E('S', 'Setting', 'Where? For example primary care, hospital ward', 0),
+    E('P', 'Perspective', 'For whom? Users, staff, managers', 1),
+    E('I', 'Intervention/Interest', 'What is being done or studied?', 2),
+    E('C', 'Comparison', 'Compared with what?', 3),
+    E('E', 'Evaluation', 'How is success measured?', 4)] },
+  { id: 'ECLIPSE', name: 'ECLIPSE', useFor: 'Health policy and management questions', elements: [
+    E('E', 'Expectation', 'What should the information improve?', 0),
+    E('C', 'Client group', 'Who is the service for?', 1),
+    E('L', 'Location', 'Where is the service?', 2),
+    E('I', 'Impact', 'What would change, and how is it measured?', 3),
+    E('P', 'Professionals', 'Who is involved in delivering it?', 4),
+    E('SE', 'SErvice', 'Which service is it?', 5)] },
+  { id: 'PCC', name: 'PCC', useFor: 'Scoping reviews (JBI)', elements: [
+    E('P', 'Population', 'Which participants?', 0),
+    E('C', 'Concept', 'Which idea, intervention or phenomenon?', 1),
+    E('C', 'Context', 'Which setting, culture or geography?', 2)] },
+  { id: 'PIRD', name: 'PIRD', useFor: 'Diagnostic test accuracy', elements: [
+    E('P', 'Population', 'Which patients are tested?', 0),
+    E('I', 'Index test', 'Which test are you evaluating?', 1),
+    E('R', 'Reference test', 'What is the gold standard?', 2, { include: false }),
+    E('D', 'Diagnosis', 'Which target condition?', 3)] },
+  { id: 'PFO', name: 'PFO', useFor: 'Prognosis and prognostic factors', elements: [
+    E('P', 'Population', 'Which patients?', 0),
+    E('F', 'Prognostic factor', 'Which factor might predict the outcome?', 1),
+    E('O', 'Outcome', 'Which future event?', 3)] },
+  { id: 'CoCoPop', name: 'CoCoPop', useFor: 'Prevalence and incidence', elements: [
+    E('Co', 'Condition', 'Which disease or condition?', 0),
+    E('Co', 'Context', 'Which setting or region?', 1),
+    E('Pop', 'Population', 'Which population?', 2)] },
+  { id: 'CIMO', name: 'CIMO', useFor: 'Management and realist questions: how and why it works', elements: [
+    E('C', 'Context', 'In which situation?', 0),
+    E('I', 'Intervention', 'What is done?', 1),
+    E('M', 'Mechanism', 'Why or how does it work?', 2),
+    E('O', 'Outcome', 'What is the result?', 3)] },
+  { id: 'BeHEMoTh', name: 'BeHEMoTh', useFor: 'Reviews of theories and models', elements: [
+    E('Be', 'Behaviour of interest', 'Which behaviour?', 0),
+    E('H', 'Health context', 'In which health context?', 1),
+    E('E', 'Exclusions', 'What to exclude (combined with NOT)', 6, { op: 'NOT' }),
+    E('MoTh', 'Models or Theories', 'Which models or theories?', 3)] }
+];
+
+const EXAMPLE_CUSTOM = { id: 'my:LSI', name: 'LSI', custom: true, useFor: 'Example custom mnemonic: library instruction', elements: [
+  E('L', 'Librarians', 'Who delivers the instruction?', 5),
+  E('S', 'Setting', 'Which kind of library?', 4),
+  E('I', 'Instruction', 'What kind of teaching or training?', 6)] };
+
+// "No framework": numbered concept blocks that the user adds, names, combines and removes.
+function concept(i, label) { return E(String(i + 1), label || 'Concept ' + (i + 1), '', i); }
+function freeMnemonic(n) {
+  return { id: 'none', name: 'No framework', free: true, useFor: 'Your own concept blocks, without a mnemonic',
+    elements: Array.from({ length: Math.max(1, n) }, (_, i) => concept(i)) };
+}
+// Keep the user's text (and the names of the parts they filled in) when leaving a mnemonic.
+function startFree(st) {
+  const filled = st.mn.elements.map((e, i) => ({ e, v: st.values[i] || '' })).filter(x => x.v.trim());
+  const mn = freeMnemonic(Math.max(2, filled.length));
+  filled.forEach((x, i) => { mn.elements[i].label = x.e.label; mn.elements[i].op = i ? x.e.op : 'AND'; });
+  st.mn = mn;
+  st.values = mn.elements.map((_, i) => (filled[i] ? filled[i].v : ''));
+}
+function renumberConcepts(mn) {
+  mn.elements.forEach((e, i) => {
+    if (/^Concept \d+$/.test(e.label)) e.label = 'Concept ' + (i + 1);
+    e.key = String(i + 1);
+    e.color = col(i);
+  });
+}
+
+const DEMOS = {
+  'No framework': ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR T2DM[tiab]',
+                   '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab]'],
+  PICO: ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR "type 2 diabetes"[tiab] OR T2DM[tiab]',
+         '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab] OR "resistance training"[tiab]',
+         '"usual care"[tiab] OR "standard care"[tiab] OR "no intervention"[tiab]',
+         '"Glycated Hemoglobin"[Mesh] OR HbA1c[tiab] OR "glycemic control"[tiab]'],
+  SPIDER: ['"Nurses"[Mesh] OR nurse*[tiab] OR "nursing staff"[tiab]',
+           '"Patient Handoff"[Mesh] OR handover*[tiab] OR handoff*[tiab] OR SBAR[tiab]',
+           'interview*[tiab] OR "focus group*"[tiab] OR ethnograph*[tiab]',
+           'experienc*[tiab] OR view*[tiab] OR perception*[tiab] OR attitude*[tiab]',
+           '"Qualitative Research"[Mesh] OR qualitative[tiab] OR "mixed method*"[tiab]'],
+  LSI: ['librarian* OR "information specialist" OR informationist* OR "information professional" OR "knowledge worker" OR "information scientist*" OR "information services"',
+        'librar* AND (medical OR academic OR research OR special OR college OR junior )',
+        'DE "library orientation" OR DE "learning" OR DE "information services" OR "User education" OR instruct* OR educat* OR orient* OR teach* OR curricul* OR train* OR pedagog* OR tutor* OR lesson* OR lectur* OR learn * OR webinar*']
+};
+
+// ---- My mnemonics (browser storage, optional) ----
+const STORE_KEY = 'medsyntax.myMnemonics.v1';
+function loadMine() {
+  try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function saveMine(list) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function allMine() {
+  const mine = loadMine();
+  if (!mine.some(m => m.name === EXAMPLE_CUSTOM.name)) mine.unshift(EXAMPLE_CUSTOM);
+  return mine;
+}
+function findMn(id) {
+  return LIBRARY.find(m => m.id === id) || allMine().find(m => m.id === id) || null;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// =====================================================================
+// State
+// =====================================================================
+function newState(id, demo) {
+  const mn = clone(findMn(id));
+  return { mn, values: mn.elements.map((_, i) => (demo && demo[i]) || ''), title: '' };
+}
+// Carry text over: same element (letter + meaning) first, then by position.
+const sameKind = e => (e.key + ':' + String(e.label || '').toLowerCase().split(/[\s\/]/)[0]);
+function setMnemonic(st, mn) {
+  mn = clone(mn);
+  const old = st.mn.elements.map((e, i) => ({ kind: sameKind(e), v: st.values[i] || '', used: false }));
+  const vals = mn.elements.map(e => {
+    const hit = old.find(o => !o.used && o.kind === sameKind(e) && o.v);
+    if (hit) { hit.used = true; return hit.v; }
+    return null;
+  });
+  const rest = old.filter(o => !o.used && o.v);
+  for (let i = 0; i < vals.length; i++) if (vals[i] === null) { const r = rest.shift(); vals[i] = r ? (r.used = true, r.v) : ''; }
+  st.mn = mn;
+  st.values = vals;
+}
+function compile(st) {
+  const parts = [];
+  st.mn.elements.forEach((e, i) => {
+    const v = (st.values[i] || '').trim();
+    if (!e.include || !v) return;
+    parts.push((parts.length ? e.op + ' ' : '') + '(' + v + ')');
+  });
+  return parts.join(' ');
+}
+function packState(oid, st) {
+  const data = { o: oid, t: st.title, n: st.mn.name, u: st.mn.useFor || '', f: st.mn.free ? 1 : 0, e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
+  return LZString.compressToEncodedURIComponent(JSON.stringify(data));
+}
+function unpackState(s) {
+  try {
+    const d = JSON.parse(LZString.decompressFromEncodedURIComponent(s));
+    if (!d || !Array.isArray(d.e)) return null;
+    const mn = { id: 'shared:' + d.n, name: d.n || 'Shared', useFor: d.u || '', custom: true,
+      elements: d.e.map(a => ({ key: a[0], label: a[1], hint: a[2], color: a[3], op: ['AND', 'OR', 'NOT'].includes(a[4]) ? a[4] : 'AND', include: !!a[5] })) };
+    if (d.f) { mn.free = true; mn.id = 'none'; }
+    return { oid: d.o, st: { mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '' } };
+  } catch (e) { return null; }
+}
+function buildLink(oid, st) { return location.href.split(/[?#]/)[0] + '?s=' + packState(oid, st); }
+
+const S = Object.assign(newState('PICO'), { step: 'pick', panel: null, draft: null });
+
+// =====================================================================
+// UI helpers
+// =====================================================================
+const qs = (r, s) => r.querySelector(s);
+const qsa = (r, s) => Array.from(r.querySelectorAll(s));
+let toastTimer;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
+function copyText(text, okMsg, fallbackInput) {
+  const fail = () => { if (fallbackInput) { fallbackInput.closest('[hidden]') && (fallbackInput.closest('[hidden]').hidden = false); fallbackInput.value = text; fallbackInput.select(); } toast('Copy was blocked. The text is selected: press Ctrl+C or Cmd+C.'); };
+  try { navigator.clipboard.writeText(text).then(() => toast(okMsg), fail); } catch (e) { fail(); }
+}
+const lettersHTML = mn => '<span class="letters" aria-hidden="true">' + mn.elements.map(e => `<span style="--el:${escapeHtml(e.color)}">${escapeHtml(e.key)}</span>`).join('') + '</span>';
+const fullName = mn => mn.elements.map(e => e.label).join(' · ');
+
+// ---------------- Editor: coloured boxes + medsyntax strategy ----------------
+function fieldHeadHTML(oid, st, e, i) {
+  if (!st.mn.free) {
+    return `<label for="${oid}-v${i}"><span class="key">${escapeHtml(e.key)}</span>${escapeHtml(e.label)}</label>
+          ${e.op === 'NOT' ? '<span class="tag not">combined with NOT</span>' : ''}
+          ${e.include ? '' : '<span class="tag">not in search</span>'}`;
+  }
+  const n = st.mn.elements.length;
+  return `<span class="key">${escapeHtml(e.key)}</span>
+          <input type="text" class="concept-name" data-name="${i}" value="${escapeHtml(e.label)}" aria-label="Name of concept ${i + 1}">
+          ${i > 0 ? `<label class="concept-op">Combine with
+            <select data-op="${i}">${['AND', 'OR', 'NOT'].map(o => `<option ${e.op === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>` : ''}
+          ${n > 1 ? `<button type="button" class="btn icon small" data-remove="${i}" aria-label="Remove concept ${i + 1}">✕</button>` : ''}`;
+}
+
+// The strategy heading shows the query title; without a title it falls back to a generic name.
+function strategyTitle(st) {
+  const t = (st.title || '').trim();
+  if (t) return t;
+  return st.mn.free ? 'Medsyntax search strategy' : 'Medsyntax ' + st.mn.name + ' search strategy';
+}
+
+function renderEditor(root, oid, st) {
+  const free = !!st.mn.free;
+  root.innerHTML = `
+  <div class="editor">
+    <div class="fields">
+      <label class="title-field">Query title<input type="text" id="${oid}-title" value="${escapeHtml(st.title)}" placeholder="Please input a title for your query here..."></label>
+      ${st.mn.elements.map((e, i) => `
+      <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+        <div class="field-head${free ? ' free' : ''}">
+          ${fieldHeadHTML(oid, st, e, i)}
+          <button type="button" class="btn small ghost clear-field" data-clear="${i}" ${(st.values[i] || '').trim() ? '' : 'hidden'} aria-label="Clear ${escapeHtml(e.label)}">Clear</button>
+        </div>
+        ${e.hint ? `<p class="hint">${escapeHtml(e.hint)}</p>` : ''}
+        <textarea id="${oid}-v${i}" spellcheck="false" ${free ? `aria-label="Search terms for ${escapeHtml(e.label)}"` : ''} placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'>${escText(st.values[i] || '')}</textarea>
+        <p class="notice" hidden></p>
+        <ul class="warns" hidden></ul>
+      </div>`).join('')}
+      ${free ? '<div class="btn-row"><button type="button" class="btn small" data-act="add-concept">+ Add concept</button></div>' : ''}
+    </div>
+    <section class="strategy">
+      <div class="strategy-head">
+        <h3 class="strategy-title">${escapeHtml(strategyTitle(st))}</h3>
+        <span class="help">Hover a part, click it, edit, press Enter</span>
+      </div>
+      <div class="blocks"></div>
+      <div class="global" aria-live="polite"></div>
+      <h4>Full query</h4>
+      <div class="full-query"></div>
+      <div class="btn-row">
+        <button type="button" class="btn" data-act="demo">Load example</button>
+        <button type="button" class="btn primary" data-act="copy">Copy query</button>
+        <button type="button" class="btn" data-act="link">Copy link</button>
+        <button type="button" class="btn" data-act="download">Download</button>
+        <button type="button" class="btn ghost" data-act="clear">Clear all</button>
+      </div>
+      <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
+    </section>
+  </div>`;
+
+  let timer;
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 6) + 'px'; };
+  qsa(root, '.field textarea').forEach(ta => {
+    requestAnimationFrame(() => grow(ta));
+    ta.addEventListener('input', () => {
+      grow(ta);
+      const i = +ta.closest('.field').dataset.i;
+      st.values[i] = ta.value;
+      clearTimeout(timer);
+      timer = setTimeout(() => refresh(root, oid, st), 120);
+    });
+  });
+  qs(root, `#${oid}-title`).addEventListener('input', e => {
+    st.title = e.target.value;
+    qs(root, '.strategy-title').textContent = strategyTitle(st);
+    syncUrl(oid, st);
+  });
+  // Clear one box.
+  qs(root, '.fields').addEventListener('click', e => {
+    const b = e.target.closest('[data-clear]'); if (!b) return;
+    const i = +b.dataset.clear;
+    const ta = qs(root, `#${oid}-v${i}`);
+    st.values[i] = ''; ta.value = ''; grow(ta);
+    refresh(root, oid, st);
+    ta.focus();
+  });
+  if (free) {
+    const fields = qs(root, '.fields');
+    fields.addEventListener('input', e => {
+      const t = e.target;
+      if (t.dataset.name === undefined) return;
+      st.mn.elements[+t.dataset.name].label = t.value;
+      clearTimeout(timer);
+      timer = setTimeout(() => refresh(root, oid, st), 200);
+    });
+    fields.addEventListener('change', e => {
+      const t = e.target;
+      if (t.dataset.op === undefined) return;
+      st.mn.elements[+t.dataset.op].op = t.value;
+      refresh(root, oid, st);
+    });
+    fields.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.remove !== undefined) {
+        const i = +b.dataset.remove;
+        st.mn.elements.splice(i, 1); st.values.splice(i, 1);
+        if (st.mn.elements[0]) st.mn.elements[0].op = 'AND';
+        renumberConcepts(st.mn);
+        renderEditor(root, oid, st);
+        updateFwBar(st);
+      }
+      if (b.dataset.act === 'add-concept') {
+        st.mn.elements.push(concept(st.mn.elements.length)); st.values.push('');
+        renderEditor(root, oid, st);
+        updateFwBar(st);
+        const last = qsa(root, '.field textarea').pop(); last && last.focus();
+      }
+    });
+  }
+  qs(root, '.strategy .btn-row').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const act = b.dataset.act;
+    const lb = qs(root, `#${oid}-linkbox`);
+    if (act === 'copy') { const q = compile(st); if (!q) return toast('Fill in at least one box first.'); copyText(q, 'Query copied', lb); }
+    if (act === 'link') copyText(buildLink(oid, st), 'Link copied', lb);
+    if (act === 'download') {
+      const q = compile(st); if (!q) return toast('Fill in at least one box first.');
+      const name = (st.title || st.mn.name + ' search').replace(/[^\w\- ]+/g, '').trim() || 'medsyntax';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([(st.title ? st.title + '\n\n' : '') + q + '\n'], { type: 'text/plain' }));
+      a.download = name + '.txt'; document.body.appendChild(a); a.click(); a.remove();
+      toast('Download started. If nothing happens, use Copy query.');
+    }
+    if (act === 'demo') {
+      const d = DEMOS[st.mn.name];
+      if (!d) return toast('No example for ' + st.mn.name + ' yet. Try PICO, SPIDER or LSI.');
+      st.values = st.mn.elements.map((_, i) => d[i] || '');
+      renderEditor(root, oid, st);
+    }
+    if (act === 'clear') { st.values = st.mn.elements.map(() => ''); renderEditor(root, oid, st); }
+  });
+  refresh(root, oid, st);
+}
+
+function refresh(root, oid, st) {
+  latestInputTime = Date.now();
+  const blocks = qs(root, '.blocks');
+  blocks.innerHTML = '';
+  const perEl = [];
+  let shown = 0;
+  st.mn.elements.forEach((e, i) => {
+    const field = qs(root, `.field[data-i="${i}"]`);
+    const ta = qs(field, 'textarea');
+    const warnsEl = qs(field, '.warns');
+    qs(field, '.clear-field').hidden = !(st.values[i] || '').trim();
+    const noticeEl = qs(field, '.notice');
+    const raw = st.values[i] || '';
+    if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; perEl.push(null); return; }
+
+    let target;
+    if (e.include) {
+      if (shown > 0) {
+        const d = document.createElement('div');
+        d.className = 'op-divider' + (e.op === 'NOT' ? ' not' : e.op === 'OR' ? ' or' : '');
+        d.textContent = e.op;
+        blocks.appendChild(d);
+      }
+      const frame = document.createElement('div');
+      frame.className = 'el-frame';
+      frame.style.setProperty('--el', e.color);
+      frame.innerHTML = `<div class="el-head"><span class="el-badge">${escapeHtml(e.key)} · ${escapeHtml(e.label)}</span><span class="warn-count" hidden></span></div><div class="medsyntax"><div class="medsyntax-target" id="${oid}-ms${i}"></div></div>`;
+      blocks.appendChild(frame);
+      target = qs(frame, '.medsyntax-target');
+      shown++;
+    } else {
+      target = document.createElement('div');
+    }
+    const res = runMedsyntax(raw, target, e.include ? {
+      onCommit: v => { st.values[i] = v; ta.value = v; refresh(root, oid, st); },
+      onCancel: () => refresh(root, oid, st)
+    } : {});
+    perEl.push(res);
+
+    if (res.str !== raw) {
+      const pos = ta.selectionStart, active = document.activeElement === ta;
+      ta.value = res.str; st.values[i] = res.str;
+      if (active) { const p = Math.min(pos + (res.str.length - raw.length), res.str.length); ta.setSelectionRange(p, p); }
+    }
+    if (res.notices.length) { noticeEl.textContent = res.notices.join(' '); noticeEl.hidden = false; } else if (!res.notices.length && noticeEl.dataset.keep !== '1') { noticeEl.hidden = true; }
+    if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
+    warnsEl.innerHTML = res.warnings.map(w => `<li><span class="warn-head">${escText(WARN_TEXT[w])}</span>${detailHTML(res.details[w])}</li>`).join('');
+    warnsEl.hidden = !res.warnings.length;
+    if (e.include && res.warnings.length) {
+      const wc = qs(target.closest('.el-frame'), '.warn-count');
+      wc.textContent = res.warnings.length === 1 ? '1 warning' : res.warnings.length + ' warnings'; wc.hidden = false;
+    }
+  });
+  if (!shown) blocks.innerHTML = '<p class="empty">Fill in a box above to see the medsyntax visualisation.</p>';
+
+  // Whole query: same parser, all warnings in one summary.
+  const q = compile(st);
+  const full = qs(root, '.full-query');
+  full.textContent = q || 'The full query will be output here.';
+  full.classList.toggle('empty', !q);
+  const g = qs(root, '.global');
+  if (!q) { g.innerHTML = ''; }
+  else {
+    const gr = runMedsyntax(q, document.createElement('div'));
+    if (!gr.warnings.length) g.innerHTML = '<p class="global-ok">No syntax problems found in the full query</p>';
+    else {
+      g.innerHTML = `<p class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</p>
+        <ul class="global-list">${gr.warnings.map(w => {
+          const where = st.mn.elements.filter((e, i) => perEl[i] && perEl[i].warnings.includes(w));
+          return `<li>${escText(WARN_TEXT[w])}${where.length ? '<span class="letters">' + where.map(e => `<span style="--el:${escapeHtml(e.color)}" title="${escapeHtml(e.label)}">${escapeHtml(e.key)}</span>`).join('') + '</span>' : ''}</li>`;
+        }).join('')}</ul>`;
+    }
+  }
+  syncUrl(oid, st);
+}
+
+// Extra line under a bracket warning: counts, plus the query text with the bracket highlighted.
+function detailHTML(d) {
+  if (!d) return '';
+  const more = d.count > 1 ? ` (${d.count} places; the first one is shown)` : '';
+  // Show lone bracket symbols in the sentence as small code chips, so "3 opening [ but 2 closing ]" reads clearly.
+  const sym = t => escText(t).replace(/(^|\s)([\[\]()])(?=[\s,.:]|$)/g, '$1<code class="sym">$2</code>');
+  const where = `${sym(d.text)}${more} <code class="warn-at">${escText(d.at.pre)}<mark>${escText(d.at.ch)}</mark>${escText(d.at.post)}</code>${d.fix ? ` <span class="warn-fix">${sym(d.fix)}</span>` : ''}`;
+  // Bracket warnings: the counts are the main message; where and how to fix sit behind "Show where".
+  if (d.lead) return `<span class="warn-lead">${sym(d.lead)}</span><details class="warn-more"><summary>Show where</summary><span class="warn-detail">${where}</span></details>`;
+  return `<span class="warn-detail">${where}</span>`;
+}
+
+let urlTimer;
+function syncUrl(oid, st) {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => { try { history.replaceState(null, '', buildLink(oid, st)); } catch (e) { /* not allowed here */ } }, 400);
+}
+
+// ---------------- Builder: create or edit a mnemonic ----------------
+function lettersToElements(txt) {
+  txt = txt.trim();
+  const keys = /[\s,;·]/.test(txt) ? txt.split(/[\s,;·]+/).filter(Boolean) : Array.from(txt);
+  return keys.map((k, i) => E(k.toUpperCase() === k ? k : k, '', '', i));
+}
+function libraryOptions(selected) {
+  const mine = allMine();
+  return `<optgroup label="Library">${LIBRARY.map(m => `<option value="${m.id}" ${m.id === selected ? 'selected' : ''}>${m.name}: ${escapeHtml(m.useFor)}</option>`).join('')}</optgroup>
+    <optgroup label="My mnemonics">${mine.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === selected ? 'selected' : ''}>${escapeHtml(m.name)}${m.useFor ? ': ' + escapeHtml(m.useFor) : ''}</option>`).join('')}</optgroup>`;
+}
+
+function renderBuilder(root, draft, handlers) {
+  const els = draft.elements;
+  root.innerHTML = `
+  <div class="panel builder">
+    <div><h3>${escapeHtml(handlers.title || 'Create your own mnemonic')}</h3>
+    <p class="sub">${handlers.sub || 'Type the letters of your mnemonic, then say what each letter stands for. Use spaces for parts longer than one letter, for example <code>S PI D E R</code>.'}</p></div>
+    <div class="b-top">
+      <label class="grow">Letters<input type="text" data-b="letters" placeholder="e.g. PEST or S PI D E R" value=""></label>
+      <button type="button" class="btn" data-act="letters">Make elements</button>
+      <label class="grow">Or start from<select data-b="from"><option value="">Choose a mnemonic…</option>${libraryOptions('')}</select></label>
+    </div>
+    <div class="b-top">
+      <label class="grow">Name<input type="text" data-b="name" value="${escapeHtml(draft.name)}" placeholder="e.g. PEST"></label>
+      <label class="grow">Use for (optional)<input type="text" data-b="useFor" value="${escapeHtml(draft.useFor || '')}" placeholder="e.g. Questions about patient education"></label>
+    </div>
+    <div class="brows">
+      ${els.length ? `<div class="brow head"><span>Letter</span><span>Stands for</span><span>Hint (optional)</span><span>Colour</span><span>Combine</span><span>In search</span><span></span></div>` : '<p class="sub">No elements yet. Type letters above, start from a mnemonic, or add an element.</p>'}
+      ${els.map((e, i) => `
+      <div class="brow" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+        <input class="k" type="text" data-f="key" value="${escapeHtml(e.key)}" aria-label="Letter ${i + 1}">
+        <input type="text" data-f="label" value="${escapeHtml(e.label)}" placeholder="What does ${escapeHtml(e.key || 'this')} stand for?" aria-label="Stands for">
+        <input class="h" type="text" data-f="hint" value="${escapeHtml(e.hint || '')}" placeholder="Question that helps users fill it in" aria-label="Hint">
+        <input type="color" data-f="color" value="${escapeHtml(e.color)}" aria-label="Colour">
+        <select class="op" data-f="op" aria-label="Combine with"><option value="AND" ${e.op === 'AND' ? 'selected' : ''}>AND</option><option value="NOT" ${e.op === 'NOT' ? 'selected' : ''}>NOT</option></select>
+        <label class="inc"><input type="checkbox" data-f="include" ${e.include ? 'checked' : ''} aria-label="Include in search"></label>
+        <span class="mv"><button type="button" class="btn icon small" data-act="up" aria-label="Move up">↑</button><button type="button" class="btn icon small" data-act="down" aria-label="Move down">↓</button><button type="button" class="btn icon small" data-act="del" aria-label="Remove">✕</button></span>
+      </div>`).join('')}
+    </div>
+    <div class="btn-row"><button type="button" class="btn small" data-act="add">+ Add element</button></div>
+    <p class="err" hidden></p>
+    <div class="btn-row">
+      ${handlers.saveFirst
+        ? '<button type="button" class="btn primary" data-act="save">Save to My mnemonics</button><button type="button" class="btn" data-act="use">Use without saving</button>'
+        : '<button type="button" class="btn primary" data-act="use">Use this mnemonic</button><button type="button" class="btn" data-act="save">Save to My mnemonics</button>'}
+      <button type="button" class="btn" data-act="json">Copy as JSON</button>
+      <button type="button" class="btn" data-act="import">Import JSON…</button>
+      <button type="button" class="btn ghost" data-act="cancel">Cancel</button>
+    </div>
+    <div class="import" hidden>
+      <label for="imp-${handlers.oid}" class="sub">Paste a mnemonic that a colleague copied as JSON:</label>
+      <textarea id="imp-${handlers.oid}"></textarea>
+      <div class="btn-row"><button type="button" class="btn small" data-act="doimport">Import</button></div>
+    </div>
+  </div>`;
+
+  const err = qs(root, '.err');
+  const showErr = m => { err.textContent = m; err.hidden = !m; };
+  const rerender = () => renderBuilder(root, draft, handlers);
+
+  root.oninput = e => {
+    const t = e.target;
+    if (t.dataset.b === 'name') draft.name = t.value;
+    if (t.dataset.b === 'useFor') draft.useFor = t.value;
+    const row = t.closest('.brow');
+    if (row && t.dataset.f) {
+      const el = draft.elements[+row.dataset.i];
+      if (t.dataset.f === 'include') el.include = t.checked;
+      else el[t.dataset.f] = t.value;
+      if (t.dataset.f === 'color') row.style.setProperty('--el', t.value);
+    }
+  };
+  root.onchange = e => {
+    const t = e.target;
+    if (t.dataset.b === 'from' && t.value) {
+      const m = clone(findMn(t.value));
+      draft.elements = m.elements; draft.name = m.custom ? m.name : m.name + ' (custom)'; draft.useFor = m.useFor; rerender();
+    }
+  };
+  root.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const act = b.dataset.act;
+    const row = b.closest('.brow'); const i = row ? +row.dataset.i : -1;
+    const els = draft.elements;
+    if (act === 'letters') {
+      const txt = qs(root, '[data-b="letters"]').value;
+      if (!txt.trim()) return showErr('Type the letters of your mnemonic first, for example PEST.');
+      draft.elements = lettersToElements(txt);
+      if (!draft.name) draft.name = txt.replace(/[\s,;·]+/g, '');
+      rerender();
+    }
+    if (act === 'add') { els.push(E('', '', '', els.length)); rerender(); }
+    if (act === 'up' && i > 0) { [els[i - 1], els[i]] = [els[i], els[i - 1]]; rerender(); }
+    if (act === 'down' && i < els.length - 1) { [els[i + 1], els[i]] = [els[i], els[i + 1]]; rerender(); }
+    if (act === 'del') { els.splice(i, 1); rerender(); }
+    if (act === 'use' || act === 'save') {
+      const m = finalizeDraft(draft);
+      if (typeof m === 'string') return showErr(m);
+      if (act === 'save') {
+        const list = loadMine().filter(x => x.name !== m.name); list.push(m);
+        toast(saveMine(list) ? m.name + ' saved to My mnemonics in this browser' : 'Could not save in this browser. Use Copy as JSON to keep it.');
+      }
+      handlers.onUse(m);
+    }
+    if (act === 'json') {
+      const m = finalizeDraft(draft);
+      if (typeof m === 'string') return showErr(m);
+      copyText(JSON.stringify(m, null, 2), 'Mnemonic copied as JSON', qs(root, '.import textarea'));
+    }
+    if (act === 'import') { qs(root, '.import').hidden = false; qs(root, '.import textarea').focus(); }
+    if (act === 'doimport') {
+      const m = parseMnemonicJSON(qs(root, '.import textarea').value);
+      if (typeof m === 'string') return showErr(m);
+      Object.assign(draft, m); rerender(); toast('Imported ' + m.name);
+    }
+    if (act === 'cancel') handlers.onCancel();
+  };
+}
+function finalizeDraft(d) {
+  const els = d.elements.map((e, i) => ({ key: (e.key || '').trim(), label: (e.label || '').trim(), hint: (e.hint || '').trim(), color: e.color || col(i), op: e.op === 'NOT' ? 'NOT' : 'AND', include: e.include !== false }));
+  if (!els.length) return 'Add at least one element.';
+  const missing = els.findIndex(e => !e.key);
+  if (missing >= 0) return 'Element ' + (missing + 1) + ' needs a letter.';
+  els.forEach(e => { if (!e.label) e.label = e.key; });
+  const name = (d.name || els.map(e => e.key).join('')).trim();
+  return { id: 'my:' + name, name, useFor: (d.useFor || '').trim(), custom: true, elements: els };
+}
+function parseMnemonicJSON(txt) {
+  try {
+    const o = JSON.parse(txt);
+    if (!o || !Array.isArray(o.elements) || !o.elements.length) return 'This JSON has no "elements" list.';
+    const m = finalizeDraft({ name: o.name, useFor: o.useFor, elements: o.elements.map((e, i) => Object.assign(E('', '', '', i), e)) });
+    return m;
+  } catch (e) { return 'This is not valid JSON. Copy the whole text, including the first { and last }.'; }
+}
+
+// =====================================================================
+// Page flow: step 1 choose a framework (cards), step 2 build the search
+// =====================================================================
+const OID = 'f';
+
+function cardHTML(m) {
+  return `<button type="button" class="card" data-id="${escapeHtml(m.id)}">
+    <span class="cname">${escapeHtml(m.name)}${m.id === EXAMPLE_CUSTOM.id ? ' <span class="tag">example</span>' : ''}</span>${lettersHTML(m)}
+    <span class="cfull">${escText(fullName(m))}</span>
+    <span class="cuse">${escText(m.useFor || '')}</span></button>`;
+}
+
+function renderSteps() {
+  const ol = document.getElementById('steps');
+  const edit = S.step === 'edit';
+  ol.innerHTML = `
+    <li aria-current="${edit ? 'false' : 'step'}">${edit
+      ? '<button type="button" class="step-link" data-act="change"><span class="num">1</span>Choose a framework</button>'
+      : '<span class="num">1</span>Choose a framework'}</li>
+    <li aria-current="${edit ? 'step' : 'false'}"><span class="num">2</span>Build your search</li>`;
+  ol.onclick = e => { if (e.target.closest('[data-act="change"]')) { S.step = 'pick'; renderApp(); } };
+}
+
+// Refresh the letter badges in the framework bar after adding or removing a concept.
+function updateFwBar(st) {
+  const old = document.querySelector('.fw-bar .letters');
+  if (old) old.outerHTML = lettersHTML(st.mn);
+}
+
+// Turn named concept blocks into a mnemonic draft: the first letter of each name becomes its letter.
+function draftFromConcepts(mn) {
+  const els = mn.elements.map((e, i) => {
+    const named = !/^Concept \d+$/.test(e.label) && e.label.trim();
+    return Object.assign(clone(e), {
+      key: named ? e.label.trim()[0].toUpperCase() : String.fromCharCode(65 + i % 26),
+      label: named ? e.label.trim() : '', hint: '' });
+  });
+  return { id: '', name: els.map(e => e.key).join(''), useFor: '', custom: true, elements: els };
+}
+
+function renderApp() {
+  const body = document.getElementById('app'), st = S;
+  renderSteps();
+  if (st.step === 'pick') {
+    const hasText = st.values.some(v => v && v.trim());
+    const mine = allMine();
+    body.innerHTML = `
+      <div class="pick-intro">
+        <h2>Which framework fits your question?</h2>
+        <p>Pick a mnemonic card to split your question into parts, or start without one and make your own concept blocks. You can save your blocks as a mnemonic later.</p>
+        <div class="btn-row">
+          <button type="button" class="btn primary" data-act="free">Start without a framework</button>
+          ${hasText ? `<button type="button" class="btn ghost" data-act="back">Back to your ${st.mn.free ? '' : escapeHtml(st.mn.name) + ' '}search</button>` : ''}
+        </div>
+        ${hasText ? '<p class="hint">Your text is kept when you switch framework.</p>' : ''}
+      </div>
+      <p class="section-label">Library</p>
+      <div class="cards">${LIBRARY.map(cardHTML).join('')}</div>
+      ${mine.length ? `<p class="section-label">My mnemonics</p><div class="cards">${mine.map(cardHTML).join('')}</div>` : ''}`;
+    body.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.id) { setMnemonic(st, findMn(b.dataset.id)); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
+      if (b.dataset.act === 'back') { st.step = 'edit'; st.panel = null; renderApp(); }
+      if (b.dataset.act === 'free') { if (!st.mn.free) startFree(st); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
+    };
+  } else {
+    const free = !!st.mn.free;
+    body.innerHTML = `
+      <div class="fw-bar">${lettersHTML(st.mn)}<span class="fwname">${escapeHtml(st.mn.name)}</span>
+        <span class="usefor">${escText(free ? 'Your own concept blocks. Name them, combine them with AND, OR or NOT, and add as many as you need.' : (st.mn.useFor || fullName(st.mn)))}</span>
+        <span class="btn-row">
+          ${free
+            ? '<button type="button" class="btn small" data-act="save-mn">Save as mnemonic</button>'
+            : `<button type="button" class="btn small" data-act="edit-mn">Edit ${escapeHtml(st.mn.name)}</button>`}
+          <button type="button" class="btn small" data-act="change">${free ? 'Choose a framework' : 'Change framework'}</button>
+        </span></div>
+      <div class="edit-panel"></div>
+      <div class="search-editor"></div>`;
+    const panel = qs(body, '.edit-panel');
+    const close = m => { if (m) setMnemonic(st, m); st.panel = null; renderApp(); };
+    if (st.panel === 'edit-mn') renderBuilder(panel, st.draft, { oid: OID, title: 'Edit ' + st.mn.name, onUse: close, onCancel: () => close(null) });
+    if (st.panel === 'save-mn') renderBuilder(panel, st.draft, { oid: OID, title: 'Save your concept blocks as a mnemonic', saveFirst: true,
+      sub: 'Each concept gets a letter: the first letter of its name. Change the letters, the name of the mnemonic or the hints, then save it. It appears under <em>My mnemonics</em> in step 1.',
+      onUse: close, onCancel: () => close(null) });
+    body.onclick = e => {
+      const b = e.target.closest('button'); if (!b || panel.contains(b)) return;
+      if (b.dataset.act === 'change') { st.step = 'pick'; st.panel = null; renderApp(); }
+      if (b.dataset.act === 'edit-mn') {
+        const d = clone(st.mn);
+        if (!d.custom) d.name = d.name + ' (custom)';
+        st.draft = d; st.panel = 'edit-mn'; renderApp();
+      }
+      if (b.dataset.act === 'save-mn') { st.draft = draftFromConcepts(st.mn); st.panel = 'save-mn'; renderApp(); }
+    };
+    renderEditor(qs(body, '.search-editor'), OID, st);
+  }
+}
+
+// =====================================================================
+// Display toggle and start-up (shared links open straight in step 2)
+// =====================================================================
+qsa(document, 'input[name="disp"]').forEach(r => r.addEventListener('change', () => {
+  document.body.classList.toggle('greyscale', r.value === 'grey' && r.checked);
+}));
+
+(function boot() {
+  const s = new URLSearchParams(location.search).get('s');
+  if (s) {
+    const u = unpackState(s);
+    if (u) { Object.assign(S, u.st); S.step = 'edit'; }
+  }
+  renderApp();
+})();
