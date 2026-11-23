@@ -4,7 +4,7 @@
     {
       "name": "static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/tedgremmen/GithubTedoutlook/medsyntaxqa"],
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/margot/Documents/GitHub/MedsyntaxQA"],
       "port": 8080
     }
   ]
