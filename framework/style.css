@@ -81,7 +81,7 @@ main { padding-block: 20px 60px; }
 
 /* toolbar (option A) */
 .letters { display: inline-flex; gap: 3px; vertical-align: middle; }
-.letters span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 4px; background: var(--el); color: #fff; font-weight: 700; font-size: .75rem; }
+.letters span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 4px; background: var(--el); color: var(--el-ink, #fff); font-weight: 700; font-size: .75rem; }
 
 /* editor */
 .editor { display: grid; gap: 22px; }
@@ -91,7 +91,7 @@ main { padding-block: 20px 60px; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .field-head label { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 5px; background: var(--el); color: #fff; font-weight: 700; font-size: .85rem; }
+.key { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 5px; background: var(--el); color: var(--el-ink, #fff); font-weight: 700; font-size: .85rem; }
 .tag { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
 .tag.not { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
 .hint { color: var(--muted); font-size: .86rem; }
@@ -112,7 +112,7 @@ main { padding-block: 20px 60px; }
 .op-divider.not { color: var(--warn-ink); }
 .el-frame { border: 3px solid var(--el); border-radius: 8px; background: #fff; padding: 0 8px 6px; max-width: 100%; min-width: min(100%, 280px); }
 .el-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 4px 10px; margin: 0 -8px 4px; }
-.el-badge { background: var(--el); color: #fff; font-size: .72rem; font-weight: 700; padding: 1px 8px 2px; border-radius: 4px 0 6px 0; font-family: var(--font-ui); }
+.el-badge { background: var(--el); color: var(--el-ink, #fff); font-size: .72rem; font-weight: 700; padding: 1px 8px 2px; border-radius: 4px 0 6px 0; font-family: var(--font-ui); }
 .el-frame .warn-count { font-size: .72rem; font-weight: 700; color: #8b1d1d; font-family: var(--font-ui); padding: 2px 8px 0; }
 .edit-msg { color: #8b1d1d; font-size: .8rem; font-family: var(--font-ui); display: block; padding: 2px 4px; }
 .greyscale .blocks { filter: grayscale(100%); }
@@ -164,6 +164,14 @@ main { padding-block: 20px 60px; }
 .card .cname { font-size: 1.1rem; font-weight: 700; }
 .card .cfull { font-size: .85rem; }
 .card .cuse { font-size: .82rem; color: var(--muted); }
+/* My mnemonics: card plus a Rename / Delete row */
+.card-wrap { display: grid; gap: 6px; align-content: start; }
+.card-wrap > .card { height: 100%; }
+.card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .85rem; }
+.card-actions .confirm-text { flex-basis: 100%; color: var(--warn-ink); font-weight: 600; }
+.card-actions .rename-input { flex: 1 1 140px; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: inherit; font: inherit; }
+.card-actions .manage-error { flex-basis: 100%; color: var(--warn-ink); }
+.btn.danger { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
 .section-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
 .fw-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .fw-bar .fwname { font-weight: 700; }

@@ -7,7 +7,7 @@ What to do before option B ("Start with cards") goes to GitHub and live on GitHu
 - **Deploy:** [.github/workflows/static.yml](../.github/workflows/static.yml) uploads the **whole repository** to GitHub Pages on every push to `main`. As soon as this branch is merged into `main`, the page is live at `<pages-url>/framework/`. So everything in "Must fix" below has to be done **before** the merge.
 - **Related:** [medsyntax-framework-b-improvements.md](medsyntax-framework-b-improvements.md) (review and ideas), [medsyntax-framework-todo.md](medsyntax-framework-todo.md) (roadmap)
 
-Status as of 23 November 2026.
+Status as of 23 November 2026: the must-fix items in section 2 are done.
 
 ---
 
@@ -45,23 +45,23 @@ What the page must do. Tick each item off once you have checked it (see the test
 ### Display and access
 - [ ] The colour/greyscale toggle works.
 - [ ] The page works at phone width (375 px), with no horizontal scrolling.
-- [ ] Contrast meets WCAG 2.1 AA (4.5:1 for small text). **Not met yet**, see section 2.
+- [ ] Contrast meets WCAG 2.1 AA (4.5:1 for small text). Fixed in section 2, item 1: check it with T23.
 - [ ] Buttons, cards and boxes can be reached and used with the keyboard (Tab, Enter, Space).
 
 ---
 
 ## 2. Must fix before release
 
-These items block the merge to `main`.
+These items blocked the merge to `main`. All six are done; check them with the tests in section 3 before merging.
 
 | # | What | Where | How |
 |---|---|---|---|
-| 1 | **Colour contrast too low.** White text on orange `#e88a00` (about 2.6:1) and green `#5f9e2f` (about 3.3:1) fails WCAG AA. | `PALETTE`, line 8 of `framework/framework.js` | Use darker shades (e.g. `#b36200`, `#3f7a1c`). For custom colours, choose black or white text automatically. Check all 10 palette colours. |
-| 2 | **No way to delete or rename a saved mnemonic.** Only clearing browser data removes it. | Step 1, *My mnemonics* (`allMine()`, `saveMine()`) | Add Rename and Delete, with a confirm step on the page (no `confirm()` pop-up). |
-| 3 | **Menu links point to someone else's sites.** *Medsyntax Editor* goes to `tedoutlook.github.io/medsyntaxqa`. *Report an issue* goes to `github.com/tedgrm/medsyntaxexperimental/issues`. | `<nav class="menu">` in `framework/index.html` | Use this repo: `../` for the editor and `https://github.com/mrgtverleg-lgtm/MedsyntaxQA/issues` for issues. |
-| 4 | **The Medsyntax app doesn't link to the framework yet.** | Menu (`dropdown-content`) in `index.html` | Add a link *Medsyntax Framework* → `framework/`. |
-| 5 | **Footer contact address.** It shows `m.verleg@mzh.nl`. | Footer in `framework/index.html` | Confirm this is the right public contact, or change it. |
-| 6 | **README is outdated.** It says the page is "ready to put in the picomedsyntax repo". | `framework/README.md` | Describe where it lives now (`framework/` in this repo) and remove the "Put it in the repo" steps that no longer apply. |
+| 1 | **Colour contrast too low.** White text on orange `#e88a00` (about 2.6:1) and green `#5f9e2f` (about 3.3:1) fails WCAG AA. | `PALETTE`, line 8 of `framework/framework.js` | **Done (23 Nov 2026):** `#e88a00`→`#9a5800`, `#5f9e2f`→`#3f7a1c`, `#e2541b`→`#b03a12`, `#00897b`→`#00796b`; all 10 now ≥ 4.5:1. Badges pick black or white text automatically (`inkFor()`). |
+| 2 | **No way to delete or rename a saved mnemonic.** Only clearing browser data removes it. | Step 1, *My mnemonics* (`allMine()`, `saveMine()`) | **Done (23 Nov 2026):** *Rename* and *Delete* under each saved card in step 1, with an inline confirm. The LSI example has none. |
+| 3 | **Menu links point to someone else's sites.** *Medsyntax Editor* goes to `tedoutlook.github.io/medsyntaxqa`. *Report an issue* goes to `github.com/tedgrm/medsyntaxexperimental/issues`. | `<nav class="menu">` in `framework/index.html` | **Done (23 Nov 2026).** |
+| 4 | **The Medsyntax app doesn't link to the framework yet.** | Menu (`dropdown-content`) in `index.html` | **Done (23 Nov 2026):** *Medsyntax Framework* added to the menu. |
+| 5 | **Footer contact address.** It shows `m.verleg@mzh.nl`. | Footer in `framework/index.html` | **Done (23 Nov 2026):** confirmed, the address stays. |
+| 6 | **README is outdated.** It says the page is "ready to put in the picomedsyntax repo". | `framework/README.md` | **Done (23 Nov 2026).** |
 
 Recommended, not blocking:
 - Load LZString from the repo (`../scripts/lzstring.js`) instead of cdnjs, so the page doesn't depend on another site.
@@ -99,7 +99,7 @@ Open http://localhost:8080/framework/ and work through the table.
 | T14 | *Change framework* → PICOS | Your P/I/C/O text is in the matching PICOS boxes | ☐ |
 | T15 | *Start without a framework*, add 3 concepts, set one to NOT | Full query uses AND/NOT in the right order | ☐ |
 | T16 | *Save as mnemonic*, reload the page | The mnemonic is under *My mnemonics* | ☐ |
-| T17 | *Copy as JSON*, delete it from *My mnemonics*, *Import JSON…* | The mnemonic is back (delete needs must-fix #2) | ☐ |
+| T17 | *Copy as JSON*, delete it from *My mnemonics*, *Import JSON…* | The mnemonic is back | ☐ |
 | T18 | Toggle *greyscale* | Medsyntax boxes switch to grey | ☐ |
 | T19 | Click a part of the medsyntax visualisation, edit, press Enter | The box text updates; clicking outside cancels | ☐ |
 | T20 | *Download* | A .txt file with the strategy | ☐ |

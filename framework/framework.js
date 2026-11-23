@@ -5,7 +5,8 @@
 // =====================================================================
 // Mnemonic library
 // =====================================================================
-const PALETTE = ['#d7263d', '#e88a00', '#5f9e2f', '#7b3fa0', '#1f6fd1', '#00897b', '#c2185b', '#6d4c41', '#455a64', '#e2541b'];
+// Each colour has at least 4.5:1 contrast with white text (WCAG 2.1 AA).
+const PALETTE = ['#d7263d', '#9a5800', '#3f7a1c', '#7b3fa0', '#1f6fd1', '#00796b', '#c2185b', '#6d4c41', '#455a64', '#b03a12'];
 const col = i => PALETTE[i % PALETTE.length];
 const E = (key, label, hint, i, extra) => Object.assign({ key, label, hint, color: col(i), op: 'AND', include: true }, extra || {});
 
@@ -206,7 +207,22 @@ function copyText(text, okMsg, fallbackInput) {
   const fail = () => { if (fallbackInput) { fallbackInput.closest('[hidden]') && (fallbackInput.closest('[hidden]').hidden = false); fallbackInput.value = text; fallbackInput.select(); } toast('Copy was blocked. The text is selected: press Ctrl+C or Cmd+C.'); };
   try { navigator.clipboard.writeText(text).then(() => toast(okMsg), fail); } catch (e) { fail(); }
 }
-const lettersHTML = mn => '<span class="letters" aria-hidden="true">' + mn.elements.map(e => `<span style="--el:${escapeHtml(e.color)}">${escapeHtml(e.key)}</span>`).join('') + '</span>';
+// Text colour on an element colour: black or white, whichever has more contrast.
+// Library colours always get white; light custom colours (or colours from old links) get black.
+function luminance(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return null;
+  return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16) / 255)
+    .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)))
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+}
+function inkFor(hex) {
+  const l = luminance(hex);
+  if (l === null) return '#fff';
+  return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.05) ? '#fff' : '#000';
+}
+const elStyle = color => `--el:${escapeHtml(color)};--el-ink:${inkFor(color)}`;
+const lettersHTML = mn => '<span class="letters" aria-hidden="true">' + mn.elements.map(e => `<span style="${elStyle(e.color)}">${escapeHtml(e.key)}</span>`).join('') + '</span>';
 const fullName = mn => mn.elements.map(e => e.label).join(' · ');
 
 // ---------------- Editor: coloured boxes + medsyntax strategy ----------------
@@ -238,7 +254,7 @@ function renderEditor(root, oid, st) {
     <div class="fields">
       <label class="title-field">Query title<input type="text" id="${oid}-title" value="${escapeHtml(st.title)}" placeholder="Please input a title for your query here..."></label>
       ${st.mn.elements.map((e, i) => `
-      <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+      <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="${elStyle(e.color)}">
         <div class="field-head${free ? ' free' : ''}">
           ${fieldHeadHTML(oid, st, e, i)}
           <button type="button" class="btn small ghost clear-field" data-clear="${i}" ${(st.values[i] || '').trim() ? '' : 'hidden'} aria-label="Clear ${escapeHtml(e.label)}">Clear</button>
@@ -380,6 +396,7 @@ function refresh(root, oid, st) {
       const frame = document.createElement('div');
       frame.className = 'el-frame';
       frame.style.setProperty('--el', e.color);
+      frame.style.setProperty('--el-ink', inkFor(e.color));
       frame.innerHTML = `<div class="el-head"><span class="el-badge">${escapeHtml(e.key)} · ${escapeHtml(e.label)}</span><span class="warn-count" hidden></span></div><div class="medsyntax"><div class="medsyntax-target" id="${oid}-ms${i}"></div></div>`;
       blocks.appendChild(frame);
       target = qs(frame, '.medsyntax-target');
@@ -423,7 +440,7 @@ function refresh(root, oid, st) {
       g.innerHTML = `<p class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</p>
         <ul class="global-list">${gr.warnings.map(w => {
           const where = st.mn.elements.filter((e, i) => perEl[i] && perEl[i].warnings.includes(w));
-          return `<li>${escText(WARN_TEXT[w])}${where.length ? '<span class="letters">' + where.map(e => `<span style="--el:${escapeHtml(e.color)}" title="${escapeHtml(e.label)}">${escapeHtml(e.key)}</span>`).join('') + '</span>' : ''}</li>`;
+          return `<li>${escText(WARN_TEXT[w])}${where.length ? '<span class="letters">' + where.map(e => `<span style="${elStyle(e.color)}" title="${escapeHtml(e.label)}">${escapeHtml(e.key)}</span>`).join('') + '</span>' : ''}</li>`;
         }).join('')}</ul>`;
     }
   }
@@ -478,7 +495,7 @@ function renderBuilder(root, draft, handlers) {
     <div class="brows">
       ${els.length ? `<div class="brow head"><span>Letter</span><span>Stands for</span><span>Hint (optional)</span><span>Colour</span><span>Combine</span><span>In search</span><span></span></div>` : '<p class="sub">No elements yet. Type letters above, start from a mnemonic, or add an element.</p>'}
       ${els.map((e, i) => `
-      <div class="brow" data-i="${i}" style="--el:${escapeHtml(e.color)}">
+      <div class="brow" data-i="${i}" style="${elStyle(e.color)}">
         <input class="k" type="text" data-f="key" value="${escapeHtml(e.key)}" aria-label="Letter ${i + 1}">
         <input type="text" data-f="label" value="${escapeHtml(e.label)}" placeholder="What does ${escapeHtml(e.key || 'this')} stand for?" aria-label="Stands for">
         <input class="h" type="text" data-f="hint" value="${escapeHtml(e.hint || '')}" placeholder="Question that helps users fill it in" aria-label="Hint">
@@ -625,9 +642,60 @@ function draftFromConcepts(mn) {
   return { id: '', name: els.map(e => e.key).join(''), useFor: '', custom: true, elements: els };
 }
 
+// ---- Manage My mnemonics: rename and delete (step 1) ----
+// A saved card gets an actions row. The LSI example is built in, so it has none.
+function myCardHTML(m, manage) {
+  if (m.id === EXAMPLE_CUSTOM.id) return cardHTML(m);
+  const id = escapeHtml(m.id), name = escapeHtml(m.name);
+  const mode = manage && manage.id === m.id ? manage.mode : null;
+  let row;
+  if (mode === 'delete') {
+    row = `<span class="confirm-text">Delete ${name}? This can't be undone.</span>
+      <button type="button" class="btn small danger" data-mng="confirm-delete" data-mid="${id}">Delete</button>
+      <button type="button" class="btn small ghost" data-mng="cancel" data-mid="${id}">Cancel</button>`;
+  } else if (mode === 'rename') {
+    row = `<input type="text" class="rename-input" value="${name}" aria-label="New name for ${name}">
+      <button type="button" class="btn small" data-mng="save-name" data-mid="${id}">Save</button>
+      <button type="button" class="btn small ghost" data-mng="cancel" data-mid="${id}">Cancel</button>
+      ${manage.error ? `<span class="manage-error" role="alert">${escText(manage.error)}</span>` : ''}`;
+  } else {
+    row = `<button type="button" class="btn small ghost" data-mng="rename" data-mid="${id}" aria-label="Rename ${name}">Rename</button>
+      <button type="button" class="btn small ghost" data-mng="delete" data-mid="${id}" aria-label="Delete ${name}">Delete</button>`;
+  }
+  return `<div class="card-wrap">${cardHTML(m)}<div class="card-actions">${row}</div></div>`;
+}
+
+// Only the saved copy changes. A search that is open in step 2 keeps its own copy of the mnemonic.
+function manageMine(st, act, id, body) {
+  const list = loadMine();
+  const m = list.find(x => x.id === id);
+  if (act === 'cancel' || !m) { st.manage = null; return renderApp(); }
+  if (act === 'rename' || act === 'delete') { st.manage = { id, mode: act }; return renderApp(); }
+  if (act === 'confirm-delete') {
+    st.manage = null;
+    toast(saveMine(list.filter(x => x.id !== id)) ? m.name + ' deleted from My mnemonics' : 'Could not change My mnemonics in this browser.');
+    return renderApp();
+  }
+  if (act === 'save-name') {
+    const name = (qs(body, '.rename-input').value || '').trim();
+    let error = '';
+    if (!name) error = 'Type a name.';
+    else if ([...allMine().filter(x => x.id !== id), ...LIBRARY].some(x => x.name.toLowerCase() === name.toLowerCase())) {
+      error = 'There is already a mnemonic called ' + name + '.';
+    }
+    if (error) { st.manage = { id, mode: 'rename', error }; return renderApp(); }
+    const old = m.name;
+    m.name = name; m.id = 'my:' + name;
+    st.manage = null;
+    toast(saveMine(list) ? old + ' renamed to ' + name : 'Could not change My mnemonics in this browser.');
+    return renderApp();
+  }
+}
+
 function renderApp() {
   const body = document.getElementById('app'), st = S;
   renderSteps();
+  if (st.step !== 'pick') st.manage = null;
   if (st.step === 'pick') {
     const hasText = st.values.some(v => v && v.trim());
     const mine = allMine();
@@ -643,9 +711,18 @@ function renderApp() {
       </div>
       <p class="section-label">Library</p>
       <div class="cards">${LIBRARY.map(cardHTML).join('')}</div>
-      ${mine.length ? `<p class="section-label">My mnemonics</p><div class="cards">${mine.map(cardHTML).join('')}</div>` : ''}`;
+      ${mine.length ? `<p class="section-label">My mnemonics</p><div class="cards">${mine.map(m => myCardHTML(m, st.manage)).join('')}</div>` : ''}`;
+    const nameInput = qs(body, '.rename-input');
+    if (nameInput) {
+      nameInput.focus(); nameInput.select();
+      nameInput.onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); qs(body, '[data-mng="save-name"]').click(); }
+        if (e.key === 'Escape') { e.preventDefault(); st.manage = null; renderApp(); }
+      };
+    }
     body.onclick = e => {
       const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.mng) { manageMine(st, b.dataset.mng, b.dataset.mid, body); return; }
       if (b.dataset.id) { setMnemonic(st, findMn(b.dataset.id)); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
       if (b.dataset.act === 'back') { st.step = 'edit'; st.panel = null; renderApp(); }
       if (b.dataset.act === 'free') { if (!st.mn.free) startFree(st); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
