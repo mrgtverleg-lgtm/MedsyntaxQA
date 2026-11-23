@@ -3,7 +3,8 @@
 // =====================================================================
 // Medsyntax engine. The block between PARSER START and PARSER END is the
 // MedsyntaxQA parser copied verbatim (regexes + syntaxParser); only the
-// warning hooks write to a collector instead of fixed DOM ids.
+// warning hooks write to a collector instead of fixed DOM ids, and
+// wordNearOpRe adds proximity operators written as words (adj3, N3, NEXT…).
 // =====================================================================
 let time = Date.now();
 let latestInputTime = 0;
@@ -24,6 +25,10 @@ let __W = new Set();
     const doubleOrRe = new RegExp('( OR OR | OR or | or OR | or or )', 'gi');
     const notRe = new RegExp('( NOT | not )', 'gi');
     const nearOpRe = new RegExp('(( \\w+[A-Za-z][\/][0-9]+)|( [A-Za-z][\/][0-9]+))', 'gi');
+    // Added in Medsyntax Framework: proximity operators without a slash, as words between terms.
+    // Ovid adj / adjN (any case), EBSCO Nn / Wn, Cochrane NEXT, Cochrane/WoS NEAR without a number, WoS SAME.
+    // NEAR/n, W/n, PRE/n and NEXT/n are already caught by nearOpRe.
+    const wordNearOpRe = new RegExp('( (?:[Aa][Dd][Jj][0-9]*|N[0-9]+|W[0-9]+|NEXT|NEAR|SAME))(?= )', 'g');
     const embaseRe = new RegExp('(([\/][A-Za-z])\\w+|([\:][A-Za-z])\\w+|([,][A-Za-z])\\w+|([.][A-Za-z])\\w+)', 'gi');
     const bracketPairRe = new RegExp('[(][^()]*?[^()\\[]*[)]', 'gm');
     const squareBracketPairRe = new RegExp('[\\[][^\\[\\]]*?[^\\[\\]]*[\\]]', 'gm');
@@ -135,6 +140,10 @@ let __W = new Set();
         });
 
         str = str.replace(nearOpRe, function (x) {
+            return nearOpFunction(x);
+        });
+
+        str = str.replace(wordNearOpRe, function (x) {
             return nearOpFunction(x);
         });
 
