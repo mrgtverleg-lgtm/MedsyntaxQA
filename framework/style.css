@@ -105,7 +105,9 @@ main { padding-block: 20px 60px; }
 .strategy-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
 .strategy h3 { font-size: 1.05rem; }
 .strategy h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
-.strategy .help { color: var(--muted); font-size: .82rem; }
+.strategy .help, .extra-box .help { color: var(--muted); font-size: .82rem; font-weight: 400; }
+/* Optional boxes under the full query: the Medsyntax visualisation and the line-by-line search */
+.extra-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; min-width: 0; }
 .blocks { display: grid; gap: 4px; justify-items: start; overflow-x: auto; }
 .blocks .empty { color: var(--muted); font-style: italic; }
 .op-divider { font-family: var(--font-serif); font-weight: 700; color: var(--ink); padding: 4px 6px; }
@@ -115,7 +117,7 @@ main { padding-block: 20px 60px; }
 .el-badge { background: var(--el); color: var(--el-ink, #fff); font-size: .72rem; font-weight: 700; padding: 1px 8px 2px; border-radius: 4px 0 6px 0; font-family: var(--font-ui); }
 .el-frame .warn-count { font-size: .72rem; font-weight: 700; color: #8b1d1d; font-family: var(--font-ui); padding: 2px 8px 0; }
 .edit-msg { color: #8b1d1d; font-size: .8rem; font-family: var(--font-ui); display: block; padding: 2px 4px; }
-.greyscale .blocks { filter: grayscale(100%); }
+html.greyscale { filter: grayscale(100%); }
 
 .global { display: grid; gap: 6px; }
 .global-ok { background: var(--ok-bg); color: var(--ok-ink); padding: 6px 12px; border-radius: 6px; font-size: .88rem; justify-self: start; }
@@ -129,6 +131,7 @@ main { padding-block: 20px 60px; }
 /* builder (table, options A and B) */
 .panel { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; margin-bottom: 18px; }
 .panel h3 { font-size: 1.05rem; }
+.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .panel .sub { color: var(--muted); font-size: .9rem; }
 .b-top { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
 .b-top label { display: grid; gap: 3px; font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 0; }
@@ -257,10 +260,23 @@ main { padding-block: 20px 60px; }
 .el-frame .op-divider.small.or { color: #0b6e6a; }
 
 /* Optional Medsyntax visualisation (closed by default) */
-.viz { display: grid; gap: 8px; min-width: 0; }
-.viz > summary { cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.viz > summary::-webkit-details-marker { display: none; }
-.viz > summary::before { content: "\25B8"; color: var(--muted); }
-.viz[open] > summary::before { content: "\25BE"; }
-.viz > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.viz, .lines-view { display: grid; gap: 8px; min-width: 0; }
+.viz > summary, .lines-view > summary { cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.viz > summary::-webkit-details-marker, .lines-view > summary::-webkit-details-marker { display: none; }
+.viz > summary::before, .lines-view > summary::before { content: "\25B8"; color: var(--muted); }
+.viz[open] > summary::before, .lines-view[open] > summary::before { content: "\25BE"; }
+.viz > summary:focus-visible, .lines-view > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .viz[open] > .blocks { margin-top: 8px; }
+
+/* Line-by-line search (multi-string table) and pasting one */
+.lines-view[open] > .lines-wrap { margin-top: 12px; }
+.lines-wrap { overflow-x: auto; }
+.lines-wrap .empty { color: var(--muted); font-style: italic; }
+.lines-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.lines-table th, .lines-table td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+.lines-table th { background: var(--surface); font-weight: 600; }
+.lines-table td:first-child { white-space: nowrap; font-family: var(--font-code); }
+.lines-table td:last-child { font-family: var(--font-code); overflow-wrap: anywhere; }
+.paste-box { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: .88rem; }
+.paste-box[hidden] { display: none; }
+.paste-box textarea { min-height: 110px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); font-family: var(--font-code); font-size: .8rem; resize: vertical; }

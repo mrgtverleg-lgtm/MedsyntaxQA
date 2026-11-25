@@ -10,6 +10,8 @@ const PALETTE = ['#d7263d', '#9a5800', '#3f7a1c', '#7b3fa0', '#1f6fd1', '#00796b
 const col = i => PALETTE[i % PALETTE.length];
 const E = (key, label, hint, i, extra) => Object.assign({ key, label, hint, color: col(i), op: 'AND', include: true }, extra || {});
 
+// The library shows 8 mnemonics, chosen to keep step 1 simple for nurses who are new to literature searching.
+// Users can add as many of their own as they like under My mnemonics.
 const LIBRARY = [
   { id: 'PICO', name: 'PICO', useFor: 'Effects of a treatment, therapy or intervention', elements: [
     E('P', 'Population/Problem', 'Who are the patients, or what is the problem?', 0),
@@ -28,10 +30,6 @@ const LIBRARY = [
     E('C', 'Comparison/Control', 'What is the alternative?', 2),
     E('O', 'Outcome', 'What do you want to measure?', 3),
     E('T', 'Time', 'Over which period is the outcome measured?', 4)] },
-  { id: 'PEO', name: 'PEO', useFor: 'Qualitative questions, aetiology and risk', elements: [
-    E('P', 'Population', 'Who is involved?', 0),
-    E('E', 'Exposure', 'What are they exposed to or experiencing?', 1),
-    E('O', 'Outcome/Themes', 'Which outcomes or themes are you looking for?', 3)] },
   { id: 'PECO', name: 'PECO', useFor: 'Environmental and occupational exposures', elements: [
     E('P', 'Population', 'Who is exposed?', 0),
     E('E', 'Exposure', 'Which exposure or risk factor?', 1),
@@ -56,33 +54,11 @@ const LIBRARY = [
     E('I', 'Impact', 'What would change, and how is it measured?', 3),
     E('P', 'Professionals', 'Who is involved in delivering it?', 4),
     E('SE', 'SErvice', 'Which service is it?', 5)] },
-  { id: 'PCC', name: 'PCC', useFor: 'Scoping reviews (JBI)', elements: [
-    E('P', 'Population', 'Which participants?', 0),
-    E('C', 'Concept', 'Which idea, intervention or phenomenon?', 1),
-    E('C', 'Context', 'Which setting, culture or geography?', 2)] },
   { id: 'PIRD', name: 'PIRD', useFor: 'Diagnostic test accuracy', elements: [
     E('P', 'Population', 'Which patients are tested?', 0),
     E('I', 'Index test', 'Which test are you evaluating?', 1),
     E('R', 'Reference test', 'What is the gold standard?', 2, { include: false }),
     E('D', 'Diagnosis', 'Which target condition?', 3)] },
-  { id: 'PFO', name: 'PFO', useFor: 'Prognosis and prognostic factors', elements: [
-    E('P', 'Population', 'Which patients?', 0),
-    E('F', 'Prognostic factor', 'Which factor might predict the outcome?', 1),
-    E('O', 'Outcome', 'Which future event?', 3)] },
-  { id: 'CoCoPop', name: 'CoCoPop', useFor: 'Prevalence and incidence', elements: [
-    E('Co', 'Condition', 'Which disease or condition?', 0),
-    E('Co', 'Context', 'Which setting or region?', 1),
-    E('Pop', 'Population', 'Which population?', 2)] },
-  { id: 'CIMO', name: 'CIMO', useFor: 'Management and realist questions: how and why it works', elements: [
-    E('C', 'Context', 'In which situation?', 0),
-    E('I', 'Intervention', 'What is done?', 1),
-    E('M', 'Mechanism', 'Why or how does it work?', 2),
-    E('O', 'Outcome', 'What is the result?', 3)] },
-  { id: 'BeHEMoTh', name: 'BeHEMoTh', useFor: 'Reviews of theories and models', elements: [
-    E('Be', 'Behaviour of interest', 'Which behaviour?', 0),
-    E('H', 'Health context', 'In which health context?', 1),
-    E('E', 'Exclusions', 'What to exclude (combined with NOT)', 6, { op: 'NOT' }),
-    E('MoTh', 'Models or Theories', 'Which models or theories?', 3)] }
 ];
 
 const EXAMPLE_CUSTOM = { id: 'my:LSI', name: 'LSI', custom: true, useFor: 'Example custom mnemonic: library instruction', elements: [
@@ -123,10 +99,13 @@ function renumberConcepts(mn) {
 const DEMOS = {
   'No framework': ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR T2DM[tiab]',
                    '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab]'],
-  PICO: ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR "type 2 diabetes"[tiab] OR T2DM[tiab]',
+  // P and O are split, so the example also shows nested concepts (AND within P, OR within O).
+  PICO: [{ name: 'Type 2 diabetes', v: '"Diabetes Mellitus, Type 2"[Mesh] OR "type 2 diabetes"[tiab] OR T2DM[tiab]',
+           more: [{ name: 'Older adults', op: 'AND', v: '"Aged"[Mesh] OR elderly[tiab] OR "older adult*"[tiab]' }] },
          '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab] OR "resistance training"[tiab]',
          '"usual care"[tiab] OR "standard care"[tiab] OR "no intervention"[tiab]',
-         '"Glycated Hemoglobin"[Mesh] OR HbA1c[tiab] OR "glycemic control"[tiab]'],
+         { name: 'Glycaemic control', v: '"Glycated Hemoglobin"[Mesh] OR HbA1c[tiab] OR "glycemic control"[tiab]',
+           more: [{ name: 'Blood glucose', op: 'OR', v: '"Blood Glucose"[Mesh] OR "blood glucose"[tiab] OR "fasting glucose"[tiab]' }] }],
   SPIDER: ['"Nurses"[Mesh] OR nurse*[tiab] OR "nursing staff"[tiab]',
            '"Patient Handoff"[Mesh] OR handover*[tiab] OR handoff*[tiab] OR SBAR[tiab]',
            'interview*[tiab] OR "focus group*"[tiab] OR ethnograph*[tiab]',
@@ -218,6 +197,131 @@ function compile(st) {
     parts.push((parts.length ? e.op + ' ' : '') + (filled.length > 1 ? '(' + inner + ')' : inner));
   });
   return parts.join(' ');
+}
+// Line-by-line search (multi-string): one line per filled box, a line that combines the parts of a
+// split letter, and a last line that combines the letters. Lines refer to each other as #1, #2...
+function searchLines(st) {
+  const lines = [], tops = [];
+  const add = (label, q) => { lines.push({ n: lines.length + 1, label, q }); return lines.length; };
+  st.mn.elements.forEach((e, i) => {
+    if (!e.include) return;
+    const filled = conceptsOf(st, i).filter(c => c.v.trim());
+    if (!filled.length) return;
+    const head = st.mn.free ? e.label : e.key + ' · ' + e.label;
+    const split = filled.length > 1;
+    const refs = filled.map(c => ({ op: c.op, n: add(split ? (st.mn.free ? e.label + ' · ' : e.key + ' · ') + (c.name.trim() || 'Concept ' + (c.s + 1)) : head, c.v.trim()) }));
+    const n = split ? add(head, refs.map((r, k) => (k ? r.op + ' ' : '') + '#' + r.n).join(' ')) : refs[0].n;
+    tops.push({ op: e.op, n });
+  });
+  if (tops.length > 1) add('Combined', tops.map((t, k) => (k ? t.op + ' ' : '') + '#' + t.n).join(' '));
+  return lines;
+}
+const linesTSV = lines => ['#\tConcept\tSearch'].concat(lines.map(l => `#${l.n}\t${l.label}\t${l.q}`)).join('\n');
+const linesTableHTML = lines => '<table class="lines-table"><thead><tr><th>#</th><th>Concept</th><th>Search</th></tr></thead><tbody>' +
+  lines.map(l => `<tr><td>#${l.n}</td><td>${escapeHtml(l.label)}</td><td>${escapeHtml(l.q)}</td></tr>`).join('') + '</tbody></table>';
+// Copy as a real table (for Word and Excel), with tab-separated text as the plain version.
+function copyTable(lines, fallbackInput) {
+  const tsv = linesTSV(lines);
+  try {
+    const item = new ClipboardItem({ 'text/html': new Blob([linesTableHTML(lines)], { type: 'text/html' }), 'text/plain': new Blob([tsv], { type: 'text/plain' }) });
+    navigator.clipboard.write([item]).then(() => toast('Table copied. Paste it into Word or Excel.'), () => copyText(tsv, 'Table copied', fallbackInput));
+  } catch (e) { copyText(tsv, 'Table copied', fallbackInput); }
+}
+// ---- Read a pasted line-by-line search ----
+// Accepts one line per row, with or without numbers (#1, 1., S1), and tab-separated columns from Word,
+// Excel or the PubMed history (number, concept name, search, result count...). Lines made only of
+// line numbers and AND/OR/NOT, like "#1 AND (#2 OR #3)", say how the other lines are combined.
+// Returns { concepts: [{ name, v, more: [{ name, op, v }] }], ops } or an error message.
+const REF_RE = /(?:#|\bS)?(\d+)/gi;
+const isRefLine = q => /\d/.test(q) && q.replace(/(?:#|\bS)?\d+|\b(?:AND|OR|NOT)\b|[()\s]/gi, '') === '';
+function parseLineSearch(text) {
+  let rows = String(text || '').split(/\r?\n/).map(r => r.split('\t').map(c => c.trim())).filter(r => r.some(Boolean));
+  if (!rows.length) return 'Paste a search first.';
+  // A header row (from our own table, Excel or PubMed) names the columns.
+  let qCol = -1, nCol = -1;
+  const head = rows[0].map(c => c.toLowerCase());
+  if (rows[0].length > 1 && head.some(c => /^(query|search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c)) && !rows[0].some(c => isRefLine(c))) {
+    qCol = head.indexOf('query') >= 0 ? head.indexOf('query') : head.findIndex(c => /^(search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c));
+    nCol = head.findIndex(c => /^(concept|name|naam|element|description)$/.test(c));
+    rows = rows.slice(1);
+  }
+  const allNumbered = rows.every(r => /^(?:#|S)?\d+(?:[.):]|\s|$)/i.test(r[0]));
+  const lines = rows.map((r, idx) => {
+    let num = null, cells = r.slice();
+    const m = cells[0].match(/^(?:#|S)?(\d+)[.):]?(?:\s+(.*))?$/i);
+    if (allNumbered && m) { num = +m[1]; if (m[2]) cells[0] = m[2]; else cells.shift(); }
+    let q, name = '';
+    if (qCol >= 0) { q = r[qCol] || ''; name = nCol >= 0 ? r[nCol] || '' : ''; }
+    else {
+      // Drop result counts, times and empty cells; the last cell left is the search, the one before it its name.
+      cells = cells.filter(c => c && !/^[\d.,\s]+$/.test(c) && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(c));
+      q = cells.length ? cells[cells.length - 1] : '';
+      if (cells.length > 1 && cells[cells.length - 2].length <= 60) name = cells[cells.length - 2];
+    }
+    q = q.replace(/^search:\s*/i, '').trim();
+    name = name.replace(/^[^·]{1,12}·\s*/, '').trim(); // "P · Population" from our own table
+    return { num: num === null ? idx + 1 : num, name, q, ref: isRefLine(q) };
+  }).filter(l => l.q);
+  if (!lines.length) return 'No search lines found in the pasted text.';
+  const byNum = new Map(lines.map(l => [l.num, l]));
+
+  // "#1 AND (#2 OR #3)" -> [{ op, ref } | { op, group: [...] }]
+  const parseRefs = q => {
+    const toks = q.match(/\(|\)|\b(?:AND|OR|NOT)\b|(?:#|\bS)?\d+/gi) || [];
+    let p = 0;
+    const list = () => {
+      const out = []; let op = 'AND';
+      while (p < toks.length && toks[p] !== ')') {
+        const t = toks[p++];
+        if (/^(AND|OR|NOT)$/i.test(t)) { op = t.toUpperCase(); continue; }
+        if (t === '(') { out.push({ op, group: list() }); p++; }
+        else out.push({ op, ref: +t.replace(/\D/g, '') });
+        op = 'AND';
+      }
+      return out;
+    };
+    return list();
+  };
+  let missing = null;
+  const lineOf = n => { const l = byNum.get(n); if (!l && missing === null) missing = n; return l; };
+  // The parts inside a node: a combining line or a bracket group. A plain search line has none.
+  const partsOf = (node, depth) => {
+    if (depth > 20) return null;
+    if (node.group) return node.group;
+    const l = lineOf(node.ref);
+    return l && l.ref ? parseRefs(l.q) : null;
+  };
+  const textOf = (node, depth = 0) => {
+    const parts = partsOf(node, depth);
+    if (!parts) { const l = lineOf(node.ref); return l ? l.q : ''; }
+    return parts.map((x, k) => (k ? x.op + ' ' : '') + (parts.length > 1 ? '(' + textOf(x, depth + 1) + ')' : textOf(x, depth + 1))).join(' ');
+  };
+  const nameOf = node => { const l = node.ref ? byNum.get(node.ref) : null; return l ? l.name : ''; };
+
+  const refLines = lines.filter(l => l.ref);
+  const top = refLines.length ? parseRefs(refLines[refLines.length - 1].q) : lines.map(l => ({ op: 'AND', ref: l.num }));
+  const concepts = top.map(t => {
+    const parts = partsOf(t, 0);
+    if (!parts) return { name: nameOf(t), v: textOf(t), more: [] };
+    return { name: nameOf(t), first: nameOf(parts[0]), v: textOf(parts[0], 1),
+      more: parts.slice(1).map(x => ({ name: nameOf(x), op: x.op, v: textOf(x, 1) })) };
+  });
+  if (missing !== null) return 'A line refers to #' + missing + ', but there is no line ' + missing + ' in the pasted text.';
+  if (!concepts.some(c => c.v.trim())) return 'No search lines found in the pasted text.';
+  return { concepts, ops: top.map(t => t.op) };
+}
+// Put a parsed search in the boxes. It keeps the framework when the concepts fit its letters;
+// otherwise it continues without a framework, with one named block per concept.
+function applyLineSearch(st, parsed) {
+  const cs = parsed.concepts, els = st.mn.elements;
+  const fits = !st.mn.free && cs.length === els.length && els.every((e, i) => e.include && (!i || e.op === parsed.ops[i]));
+  if (!fits) {
+    st.mn = freeMnemonic(cs.length);
+    cs.forEach((c, i) => { if (c.name) st.mn.elements[i].label = c.name; st.mn.elements[i].op = i ? parsed.ops[i] : 'AND'; });
+  }
+  st.values = cs.map(c => c.v);
+  st.subs = cs.map(c => ({ name: c.more.length ? (c.first || '') : '', more: c.more }));
+  return fits;
 }
 function packState(oid, st) {
   const data = { o: oid, t: st.title, n: st.mn.name, u: st.mn.useFor || '', f: st.mn.free ? 1 : 0, e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
@@ -319,6 +423,8 @@ function setBox(st, i, s, v) { if (s) st.subs[i].more[s - 1].v = v; else st.valu
 
 const VIZ_KEY = 'medsyntax.showVisualisation';
 function showViz() { try { return localStorage.getItem(VIZ_KEY) === '1'; } catch (e) { return false; } }
+const LINES_KEY = 'medsyntax.showLines';
+function showLines() { try { return localStorage.getItem(LINES_KEY) === '1'; } catch (e) { return false; } }
 
 // The strategy heading shows the query title; without a title it falls back to a generic name.
 function strategyTitle(st) {
@@ -345,30 +451,44 @@ function renderEditor(root, oid, st) {
       ${free ? '<div class="btn-row"><button type="button" class="btn small" data-act="add-concept">+ Add concept</button></div>' : ''}
     </div>
     <section class="strategy">
-      <div class="strategy-head">
-        <h3 class="strategy-title">${escapeHtml(strategyTitle(st))}</h3>
-      </div>
-      <details class="viz" ${showViz() ? 'open' : ''}>
-        <summary>Medsyntax visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
-        <div class="blocks"></div>
-      </details>
+      <div class="strategy-head"><h3 class="strategy-title">${escapeHtml(strategyTitle(st))}</h3></div>
       <div class="global" aria-live="polite"></div>
       <h4>Full query</h4>
       <div class="full-query"></div>
       <div class="btn-row">
         <button type="button" class="btn" data-act="demo">Load example</button>
         <button type="button" class="btn primary" data-act="copy">Copy query</button>
+        <button type="button" class="btn" data-act="copy-table">Copy table</button>
+        <button type="button" class="btn" data-act="paste-table">Paste a line-by-line search…</button>
         <button type="button" class="btn" data-act="link">Copy link</button>
         <button type="button" class="btn" data-act="download">Download</button>
         <button type="button" class="btn ghost" data-act="clear">Clear all</button>
       </div>
       <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
+      <div class="paste-box" hidden>
+        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history in PubMed. Lines like <code>#1 AND #2</code> tell the tool how the lines are combined.</label>
+        <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
+        <p class="err" hidden></p>
+        <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
+      </div>
     </section>
+    <details class="extra-box viz" ${showViz() ? 'open' : ''}>
+      <summary>Medsyntax visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
+      <div class="blocks"></div>
+    </details>
+    <details class="extra-box lines-view" ${showLines() ? 'open' : ''}>
+      <summary>Line-by-line search <span class="help">One line per concept, then lines that combine them</span></summary>
+      <div class="lines-wrap"></div>
+    </details>
   </div>`;
 
   // The visualisation is optional: closed by default, and the choice is remembered in this browser.
   qs(root, '.viz').addEventListener('toggle', e => {
     try { localStorage.setItem(VIZ_KEY, e.target.open ? '1' : '0'); } catch (err) { /* storage blocked */ }
+  });
+  // The line-by-line search is optional too: closed by default, remembered in this browser.
+  qs(root, '.lines-view').addEventListener('toggle', e => {
+    try { localStorage.setItem(LINES_KEY, e.target.open ? '1' : '0'); } catch (err) { /* storage blocked */ }
   });
   let timer;
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 6) + 'px'; };
@@ -464,24 +584,63 @@ function renderEditor(root, oid, st) {
     const act = b.dataset.act;
     const lb = qs(root, `#${oid}-linkbox`);
     if (act === 'copy') { const q = compile(st); if (!q) return toast('Fill in at least one box first.'); copyText(q, 'Query copied', lb); }
+    if (act === 'copy-table') { const l = searchLines(st); if (!l.length) return toast('Fill in at least one box first.'); copyTable(l, lb); }
+    if (act === 'paste-table') { const pb = qs(root, '.paste-box'); pb.hidden = false; qs(pb, 'textarea').focus(); }
     if (act === 'link') copyText(buildLink(oid, st), 'Link copied', lb);
     if (act === 'download') {
       const q = compile(st); if (!q) return toast('Fill in at least one box first.');
       const name = (st.title || st.mn.name + ' search').replace(/[^\w\- ]+/g, '').trim() || 'medsyntax';
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([(st.title ? st.title + '\n\n' : '') + q + '\n'], { type: 'text/plain' }));
+      const txt = (st.title ? st.title + '\n\n' : '') + 'Full query\n' + q + '\n\nLine by line\n' + linesTSV(searchLines(st)) + '\n';
+      a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
       a.download = name + '.txt'; document.body.appendChild(a); a.click(); a.remove();
       toast('Download started. If nothing happens, use Copy query.');
     }
     if (act === 'demo') {
       const d = DEMOS[st.mn.name];
       if (!d) return toast('No example for ' + st.mn.name + ' yet. Try PICO, SPIDER or LSI.');
-      st.values = st.mn.elements.map((_, i) => d[i] || '');
-      st.subs = st.mn.elements.map(emptySub);
+      // A demo entry is the text of one letter, or { name, v, more } for a split letter.
+      st.values = st.mn.elements.map((_, i) => (typeof d[i] === 'object' ? d[i].v : d[i]) || '');
+      st.subs = st.mn.elements.map((_, i) => (d[i] && typeof d[i] === 'object' ? { name: d[i].name || '', more: clone(d[i].more || []) } : emptySub()));
       renderEditor(root, oid, st);
     }
-    if (act === 'clear') { st.values = st.mn.elements.map(() => ''); st.subs = st.mn.elements.map(emptySub); renderEditor(root, oid, st); }
+    // Clear all: the text, the query title and the names of the concepts.
+    if (act === 'clear') {
+      st.title = '';
+      st.values = st.mn.elements.map(() => '');
+      st.subs = st.mn.elements.map(emptySub);
+      if (free) st.mn.elements.forEach((e, i) => { e.label = 'Concept ' + (i + 1); });
+      renderEditor(root, oid, st);
+    }
   });
+  // Paste a line-by-line search: in the paste box, or straight into an empty editor.
+  const pasteBox = qs(root, '.paste-box'), pasteErr = qs(pasteBox, '.err');
+  const readSearch = text => {
+    const parsed = parseLineSearch(text);
+    if (typeof parsed === 'string') return parsed;
+    const fits = applyLineSearch(st, parsed);
+    renderApp();
+    toast(`Read ${parsed.concepts.length} ${parsed.concepts.length === 1 ? 'concept' : 'concepts'}` + (fits ? ' into ' + st.mn.name : ' as concept blocks without a framework'));
+    return '';
+  };
+  pasteBox.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.act === 'cancel-paste') { pasteBox.hidden = true; pasteErr.hidden = true; }
+    if (b.dataset.act === 'do-paste') { const m = readSearch(qs(pasteBox, 'textarea').value); pasteErr.textContent = m; pasteErr.hidden = !m; }
+  });
+  qsa(root, '.field textarea').forEach(ta => ta.addEventListener('paste', e => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const rows = text.split(/\r?\n/).filter(r => r.trim());
+    if (rows.length < 2 || !rows.some(r => isRefLine(r.split('\t').filter(c => c.trim()).pop().replace(/^(?:#|S)?\d+[.):]?\s+/i, '')))) return;
+    e.preventDefault();
+    const empty = st.mn.elements.every((_, i) => conceptsOf(st, i).every(c => !c.v.trim()));
+    if (empty && !readSearch(text)) return;
+    // Boxes already have text (or the text could not be read): show it in the paste box first.
+    pasteBox.hidden = false; qs(pasteBox, 'textarea').value = text;
+    pasteErr.textContent = empty ? parseLineSearch(text) : 'This looks like a line-by-line search. Click Read search to put it in the boxes; this replaces what is in them now.';
+    pasteErr.hidden = false;
+    pasteBox.scrollIntoView({ block: 'nearest' });
+  }));
   refresh(root, oid, st);
 }
 
@@ -577,6 +736,8 @@ function refresh(root, oid, st) {
   const full = qs(root, '.full-query');
   full.textContent = q || 'The full query will be output here.';
   full.classList.toggle('empty', !q);
+  const lines = searchLines(st);
+  qs(root, '.lines-wrap').innerHTML = lines.length ? linesTableHTML(lines) : '<p class="empty">Fill in a box above to see the search line by line.</p>';
   const g = qs(root, '.global');
   if (!q) { g.innerHTML = ''; }
   else {
@@ -627,8 +788,9 @@ function renderBuilder(root, draft, handlers) {
   const els = draft.elements;
   root.innerHTML = `
   <div class="panel builder">
-    <div><h3>${escapeHtml(handlers.title || 'Create your own mnemonic')}</h3>
-    <p class="sub">${handlers.sub || 'Type the letters of your mnemonic, then say what each letter stands for. Use spaces for parts longer than one letter, for example <code>S PI D E R</code>.'}</p></div>
+    <div class="panel-head"><h3>${escapeHtml(handlers.title || 'Create your own mnemonic')}</h3>
+    <button type="button" class="btn icon small" data-act="cancel" aria-label="Close">✕</button></div>
+    <div><p class="sub">${handlers.sub || 'Type the letters of your mnemonic, then say what each letter stands for. Use spaces for parts longer than one letter, for example <code>S PI D E R</code>.'}</p></div>
     <div class="b-top">
       <label class="grow">Letters<input type="text" data-b="letters" placeholder="e.g. PEST or S PI D E R" value=""></label>
       <button type="button" class="btn" data-act="letters">Make elements</button>
@@ -668,6 +830,7 @@ function renderBuilder(root, draft, handlers) {
     </div>
   </div>`;
 
+  root.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); handlers.onCancel(); } };
   const err = qs(root, '.err');
   const showErr = m => { err.textContent = m; err.hidden = !m; };
   const rerender = () => renderBuilder(root, draft, handlers);
@@ -880,8 +1043,8 @@ function renderApp() {
         <span class="usefor">${escText(free ? 'Your own concept blocks. Name them, combine them with AND, OR or NOT, and add as many as you need.' : (st.mn.useFor || fullName(st.mn)))}</span>
         <span class="btn-row">
           ${free
-            ? '<button type="button" class="btn small" data-act="save-mn">Save as mnemonic</button>'
-            : `<button type="button" class="btn small" data-act="edit-mn">Edit ${escapeHtml(st.mn.name)}</button>`}
+            ? `<button type="button" class="btn small" data-act="save-mn" aria-expanded="${st.panel === 'save-mn'}">${st.panel === 'save-mn' ? 'Close' : 'Save as mnemonic'}</button>`
+            : `<button type="button" class="btn small" data-act="edit-mn" aria-expanded="${st.panel === 'edit-mn'}">${st.panel === 'edit-mn' ? 'Close' : 'Edit ' + escapeHtml(st.mn.name)}</button>`}
           <button type="button" class="btn small" data-act="change">${free ? 'Choose a framework' : 'Change framework'}</button>
         </span></div>
       <div class="edit-panel"></div>
@@ -895,6 +1058,8 @@ function renderApp() {
     body.onclick = e => {
       const b = e.target.closest('button'); if (!b || panel.contains(b)) return;
       if (b.dataset.act === 'change') { st.step = 'pick'; st.panel = null; renderApp(); }
+      // The same button opens and closes the panel.
+      if ((b.dataset.act === 'edit-mn' || b.dataset.act === 'save-mn') && st.panel === b.dataset.act) { close(null); return; }
       if (b.dataset.act === 'edit-mn') {
         const d = clone(st.mn);
         if (!d.custom) d.name = d.name + ' (custom)';
@@ -910,7 +1075,7 @@ function renderApp() {
 // Display toggle and start-up (shared links open straight in step 2)
 // =====================================================================
 qsa(document, 'input[name="disp"]').forEach(r => r.addEventListener('change', () => {
-  document.body.classList.toggle('greyscale', r.value === 'grey' && r.checked);
+  document.documentElement.classList.toggle('greyscale', r.value === 'grey' && r.checked);
 }));
 
 (function boot() {

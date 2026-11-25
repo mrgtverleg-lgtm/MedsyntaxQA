@@ -2,7 +2,7 @@
 
 Option B ("Start with cards") of the framework design. It lives in `framework/` in the MedsyntaxQA repo, next to the Medsyntax app, and GitHub Pages serves it from `main` at `<pages-url>/framework/`. English interface.
 
-1. **Choose a framework.** Pick a mnemonic card (PICO, SPIDER, PCC…), or *Start without a framework*: numbered concept blocks you name yourself, add or remove, and combine with AND, OR or NOT. In step 2, *Save as mnemonic* turns your blocks into your own mnemonic (saved under *My mnemonics*).
+1. **Choose a framework.** Pick one of the 8 mnemonic cards (PICO, PICOS, PICOT, PECO, SPIDER, SPICE, ECLIPSE, PIRD), or *Start without a framework*: numbered concept blocks you name yourself, add or remove, and combine with AND, OR or NOT. In step 2, *Save as mnemonic* turns your blocks into your own mnemonic (saved under *My mnemonics*).
 2. **Build your search.** Fill in the coloured boxes. Medsyntax shows each part as a coloured box, joins them with AND (or NOT), checks the syntax and gives you the full query.
 
 ## Files
