@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/margot/Documents/GitHub/MedsyntaxQA"],
       "port": 8080
+    },
+    {
+      "name": "framework-tests",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "/Users/margot/Documents/GitHub/MedsyntaxQA"],
+      "port": 8123
     }
   ]
 }

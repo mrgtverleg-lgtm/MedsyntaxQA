@@ -41,11 +41,6 @@ export default defineConfig({
     },
 
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
@@ -71,11 +66,14 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  /* Serve the repo locally, so framework/ runs over http (localStorage and ?s= links need it). */
+  webServer: {
+    command: 'python3 -m http.server 8123',
+    url: 'http://localhost:8123/framework/',
+    reuseExistingServer: !process.env.CI,
+    /* Hide the server's request log (python3 writes it to stderr). */
+    stdout: 'ignore',
+    stderr: 'ignore',
+  },
 });
 
