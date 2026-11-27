@@ -272,7 +272,7 @@ html.greyscale { filter: grayscale(100%); }
 .viz[open] > .blocks { margin-top: 8px; }
 
 /* Line-by-line search (multi-string table) and pasting one */
-.lines-view[open] > .lines-wrap { margin-top: 12px; }
+.lines-view[open] > .lines-actions { margin-top: 12px; }
 .lines-wrap { overflow-x: auto; }
 .lines-wrap .empty { color: var(--muted); font-style: italic; }
 .lines-table { border-collapse: collapse; width: 100%; font-size: .85rem; }

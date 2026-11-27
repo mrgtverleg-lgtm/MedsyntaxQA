@@ -287,17 +287,45 @@ function copyTable(lines, fallbackInput) {
 // Returns { concepts: [{ name, v, more: [{ name, op, v }] }], ops } or an error message.
 const REF_RE = /(?:#|\bS)?(\d+)/gi;
 const isRefLine = q => /\d/.test(q) && q.replace(/(?:#|\bS)?\d+|\b(?:AND|OR|NOT)\b|[()\s]/gi, '') === '';
+// A line that combines earlier lines with a limit, like Embase "#3 AND [english]/lim" or
+// "#4 AND [2015-2025]/py": the refs come first, then one operator and the limit.
+// Returns { refs, op, term } or null. Refs need # or S here, so "covid 19 AND ..." is never one.
+function splitLimitLine(q) {
+  const re = /\s*(\(|\)|(?:#|\bS)\d+|\b(?:AND|OR|NOT)\b)/giy;
+  let m, depth = 0, best = null;
+  re.lastIndex = 0;
+  while ((m = re.exec(q))) {
+    const t = m[1];
+    if (t === '(') depth++;
+    else if (t === ')') { if (--depth < 0) return best; }
+    else if (/^(AND|OR|NOT)$/i.test(t)) {
+      const prefix = q.slice(0, m.index), rest = q.slice(re.lastIndex).trim();
+      if (!depth && /[#S]\d/i.test(prefix) && rest && !isRefLine(rest)) best = { refs: prefix.trim(), op: t.toUpperCase(), term: rest };
+    }
+  }
+  return best;
+}
+// Dates in a search history export, like "27 Nov 2026", "Nov 27, 2026", "2026-11-27" or "27/11/2026".
+const isDate = c => /^(\d{1,2}[\s\-/.][A-Za-z]{3,9}\.?[\s\-/.]\d{2,4}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}[/.]\d{2,4})([ T]\d{1,2}:\d{2}(:\d{2})?)?$/.test(c);
 function parseLineSearch(text) {
   let rows = String(text || '').split(/\r?\n/).map(r => r.split('\t').map(c => c.trim())).filter(r => r.some(Boolean));
   if (!rows.length) return 'Paste a search first.';
-  // A header row (from our own table, Excel or PubMed) names the columns.
+  // A header row (from our own table, Excel or PubMed) names the columns. A spreadsheet may have
+  // a title above it, like "Embase.com Query 18/06/2026": rows before the header are left out.
   let qCol = -1, nCol = -1;
-  const head = rows[0].map(c => c.toLowerCase());
-  if (rows[0].length > 1 && head.some(c => /^(query|search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c)) && !rows[0].some(c => isRefLine(c))) {
-    qCol = head.indexOf('query') >= 0 ? head.indexOf('query') : head.findIndex(c => /^(search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c));
+  const isSearchHead = c => /^(query|search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c);
+  const hi = rows.slice(0, 4).findIndex(r => r.filter(Boolean).length > 1 && r.some(c => isSearchHead(c.toLowerCase())) && !r.some(c => isRefLine(c)));
+  if (hi >= 0) {
+    const head = rows[hi].map(c => c.toLowerCase());
+    qCol = head.indexOf('query') >= 0 ? head.indexOf('query') : head.findIndex(isSearchHead);
     nCol = head.findIndex(c => /^(concept|name|naam|element|description)$/.test(c));
-    rows = rows.slice(1);
+    rows = rows.slice(hi + 1);
   }
+  // Without a header: a title line above numbered lines is not a search line either.
+  const numbered = r => /^(?:#|S)?\d+(?:[.):]|\s|$)/i.test(r.find(Boolean) || '');
+  while (rows.length > 2 && !numbered(rows[0]) && rows.slice(1).every(numbered)) rows = rows.slice(1);
+  // Spreadsheets copy empty leading cells (column A left blank): drop the columns that are empty in every row.
+  while (rows.length && rows.every(r => !r[0]) && rows.every(r => r.length > 1)) { rows = rows.map(r => r.slice(1)); if (qCol > 0) qCol--; if (nCol > 0) nCol--; }
   const allNumbered = rows.every(r => /^(?:#|S)?\d+(?:[.):]|\s|$)/i.test(r[0]));
   const lines = rows.map((r, idx) => {
     let num = null, cells = r.slice();
@@ -307,7 +335,7 @@ function parseLineSearch(text) {
     if (qCol >= 0) { q = r[qCol] || ''; name = nCol >= 0 ? r[nCol] || '' : ''; }
     else {
       // Drop result counts, times and empty cells; the last cell left is the search, the one before it its name.
-      cells = cells.filter(c => c && !/^[\d.,\s]+$/.test(c) && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(c));
+      cells = cells.filter(c => c && !/^[\d.,\s]+$/.test(c) && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(c) && !isDate(c));
       q = cells.length ? cells[cells.length - 1] : '';
       if (cells.length > 1 && cells[cells.length - 2].length <= 60) name = cells[cells.length - 2];
     }
@@ -320,7 +348,8 @@ function parseLineSearch(text) {
       q = nums.join(' ' + ov[1].toUpperCase() + ' ');
     }
     name = name.replace(/^[^·]{1,12}·\s*/, '').trim(); // "P · Population" from our own table
-    return { num: num === null ? idx + 1 : num, name, q, ref: isRefLine(q) };
+    const limit = isRefLine(q) ? null : splitLimitLine(q);
+    return { num: num === null ? idx + 1 : num, name, q, ref: isRefLine(q) || !!limit, limit };
   }).filter(l => l.q);
   if (!lines.length) return 'No search lines found in the pasted text.';
   const byNum = new Map(lines.map(l => [l.num, l]));
@@ -345,24 +374,46 @@ function parseLineSearch(text) {
   let missing = null;
   const lineOf = n => { const l = byNum.get(n); if (!l && missing === null) missing = n; return l; };
   // The parts inside a node: a combining line or a bracket group. A plain search line has none.
+  // A limit line is its refs (one node, or a bracket group) plus the limit as a term node.
+  const linePartsOf = l => {
+    if (!l.limit) return parseRefs(l.q);
+    const head = parseRefs(l.limit.refs);
+    return [head.length === 1 ? head[0] : { op: 'AND', group: head }, { op: l.limit.op, term: l.limit.term }];
+  };
   const partsOf = (node, depth) => {
-    if (depth > 20) return null;
+    if (depth > 20 || node.term) return null;
     if (node.group) return node.group;
     const l = lineOf(node.ref);
-    return l && l.ref ? parseRefs(l.q) : null;
+    return l && l.ref ? linePartsOf(l) : null;
   };
   const textOf = (node, depth = 0) => {
+    if (node.term) return node.term;
     const parts = partsOf(node, depth);
     if (!parts) { const l = lineOf(node.ref); return l ? l.q : ''; }
     return parts.map((x, k) => (k ? x.op + ' ' : '') + (parts.length > 1 ? '(' + textOf(x, depth + 1) + ')' : textOf(x, depth + 1))).join(' ');
   };
-  const nameOf = node => { const l = node.ref ? byNum.get(node.ref) : null; return l ? l.name : ''; };
+  const nameOf = node => { if (node.term) return 'Limit'; const l = node.ref ? byNum.get(node.ref) : null; return l ? l.name : ''; };
 
   const refLines = lines.filter(l => l.ref);
-  const top = refLines.length ? parseRefs(refLines[refLines.length - 1].q) : lines.map(l => ({ op: 'AND', ref: l.num }));
+  // The final line is the combining line with the highest number: Embase lists its history newest first.
+  const last = refLines.reduce((a, l) => (!a || l.num > a.num ? l : a), null);
+  let top = last ? linePartsOf(last) : lines.map(l => ({ op: 'AND', ref: l.num }));
+  // Limits added on top of a combined search ("#3 AND [english]/lim", then "#4 AND [2015-2025]/py"):
+  // open up the AND line they were added to, so its concepts and each limit get a box of their own.
+  // NOT lines are opened up too ("#21 NOT #24", "#25 NOT (... 'conference abstract'/it ...)").
+  // The NOT parts then go last: A AND B NOT C means the same in every database, while
+  // A NOT C AND B does not in Scopus, where AND NOT is done last.
+  const andNot = list => list.slice(1).every(t => t.op === 'AND' || t.op === 'NOT');
+  let opened = false;
+  for (let guard = 0; guard < 40 && top.some(t => t.term) && andNot(top); guard++) {
+    const inner = top[0].term ? null : partsOf(top[0], 0);
+    if (!inner || !andNot(inner)) break;
+    top = inner.concat(top.slice(1)); opened = true;
+  }
+  if (opened) top = [top[0]].concat(top.slice(1).filter(t => t.op !== 'NOT'), top.slice(1).filter(t => t.op === 'NOT'));
   const concepts = top.map(t => {
     const parts = partsOf(t, 0);
-    if (!parts) return { name: nameOf(t), v: textOf(t), more: [] };
+    if (!parts) return { name: nameOf(t), v: textOf(t), more: [], limit: !!t.term };
     return { name: nameOf(t), first: nameOf(parts[0]), v: textOf(parts[0], 1),
       more: parts.slice(1).map(x => ({ name: nameOf(x), op: x.op, v: textOf(x, 1) })) };
   });
@@ -374,7 +425,8 @@ function parseLineSearch(text) {
 // otherwise it continues without a framework, with one named block per concept.
 function applyLineSearch(st, parsed) {
   const cs = parsed.concepts, els = st.mn.elements;
-  const fits = !st.mn.free && cs.length === els.length && els.every((e, i) => e.include && (!i || e.op === parsed.ops[i]));
+  // A limit ([english]/lim, [2015-2025]/py) is never a letter of the framework.
+  const fits = !st.mn.free && !cs.some(c => c.limit) && cs.length === els.length && els.every((e, i) => e.include && (!i || e.op === parsed.ops[i]));
   if (!fits) {
     st.mn = freeMnemonic(cs.length);
     cs.forEach((c, i) => { if (c.name) st.mn.elements[i].label = c.name; st.mn.elements[i].op = i ? parsed.ops[i] : 'AND'; });
@@ -522,19 +574,11 @@ function renderEditor(root, oid, st) {
       <div class="btn-row">
         <button type="button" class="btn" data-act="demo">Load example</button>
         <button type="button" class="btn primary" data-act="copy">Copy query</button>
-        <button type="button" class="btn" data-act="copy-table">Copy table</button>
-        <button type="button" class="btn" data-act="paste-table">Paste a line-by-line search…</button>
         <button type="button" class="btn" data-act="link">Copy link</button>
         <button type="button" class="btn" data-act="download">Download</button>
         <button type="button" class="btn ghost" data-act="clear">Clear all</button>
       </div>
       <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
-      <div class="paste-box" hidden>
-        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}. Lines like <code>#1 AND #2</code>, <code>S1 AND S2</code> or <code>or/1-3</code> tell the tool how the lines are combined.</label>
-        <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
-        <p class="err" hidden></p>
-        <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
-      </div>
     </section>
     <details class="extra-box viz" ${showViz() ? 'open' : ''}>
       <summary>Medsyntax visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
@@ -542,6 +586,16 @@ function renderEditor(root, oid, st) {
     </details>
     <details class="extra-box lines-view" ${showLines() ? 'open' : ''}>
       <summary>Line-by-line search <span class="help">One line per concept, then lines that combine them</span></summary>
+      <div class="btn-row lines-actions">
+        <button type="button" class="btn" data-act="copy-table">Copy table</button>
+        <button type="button" class="btn" data-act="paste-table">Paste a line-by-line search…</button>
+      </div>
+      <div class="paste-box" hidden>
+        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}. Lines like <code>#1 AND #2</code>, <code>S1 AND S2</code> or <code>or/1-3</code> tell the tool how the lines are combined. Limit lines like <code>#3 AND [english]/lim</code> become blocks of their own.</label>
+        <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
+        <p class="err" hidden></p>
+        <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
+      </div>
       <div class="lines-wrap"></div>
     </details>
   </div>`;
@@ -661,8 +715,6 @@ function renderEditor(root, oid, st) {
     const act = b.dataset.act;
     const lb = qs(root, `#${oid}-linkbox`);
     if (act === 'copy') { const q = compile(st); if (!q) return toast('Fill in at least one box first.'); copyText(q, 'Query copied', lb); }
-    if (act === 'copy-table') { const l = searchLines(st); if (!l.length) return toast('Fill in at least one box first.'); copyTable(l, lb); }
-    if (act === 'paste-table') { const pb = qs(root, '.paste-box'); pb.hidden = false; qs(pb, 'textarea').focus(); }
     if (act === 'link') copyText(buildLink(oid, st), 'Link copied', lb);
     if (act === 'download') {
       const q = compile(st); if (!q) return toast('Fill in at least one box first.');
@@ -692,7 +744,13 @@ function renderEditor(root, oid, st) {
     }
   });
   // Paste a line-by-line search: in the paste box, or straight into an empty editor.
-  const pasteBox = qs(root, '.paste-box'), pasteErr = qs(pasteBox, '.err');
+  const pasteBox = qs(root, '.paste-box'), pasteErr = qs(pasteBox, '.err'), linesView = qs(root, '.lines-view');
+  const openPaste = () => { linesView.open = true; pasteBox.hidden = false; };
+  qs(root, '.lines-actions').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.act === 'copy-table') { const l = searchLines(st); if (!l.length) return toast('Fill in at least one box first.'); copyTable(l, qs(root, `#${oid}-linkbox`)); }
+    if (b.dataset.act === 'paste-table') { openPaste(); qs(pasteBox, 'textarea').focus(); }
+  });
   const readSearch = text => {
     const parsed = parseLineSearch(text);
     if (typeof parsed === 'string') return parsed;
@@ -709,12 +767,14 @@ function renderEditor(root, oid, st) {
   qsa(root, '.field textarea').forEach(ta => ta.addEventListener('paste', e => {
     const text = (e.clipboardData || window.clipboardData).getData('text');
     const rows = text.split(/\r?\n/).filter(r => r.trim());
-    if (rows.length < 2 || !rows.some(r => isRefLine(r.split('\t').filter(c => c.trim()).pop().replace(/^(?:#|S)?\d+[.):]?\s+/i, '')))) return;
+    // Any cell may hold the combining line: history exports put result counts and dates after it.
+    const combines = r => r.split('\t').map(x => x.trim().replace(/^(?:#|S)?\d+[.):]?\s+/i, '')).some(c => /\b(?:AND|OR|NOT)\b/i.test(c) && (isRefLine(c) || !!splitLimitLine(c)));
+    if (rows.length < 2 || !rows.some(combines)) return;
     e.preventDefault();
     const empty = st.mn.elements.every((_, i) => conceptsOf(st, i).every(c => !c.v.trim()));
     if (empty && !readSearch(text)) return;
     // Boxes already have text (or the text could not be read): show it in the paste box first.
-    pasteBox.hidden = false; qs(pasteBox, 'textarea').value = text;
+    openPaste(); qs(pasteBox, 'textarea').value = text;
     pasteErr.textContent = empty ? parseLineSearch(text) : 'This looks like a line-by-line search. Click Read search to put it in the boxes; this replaces what is in them now.';
     pasteErr.hidden = false;
     pasteBox.scrollIntoView({ block: 'nearest' });
