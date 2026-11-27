@@ -438,6 +438,10 @@ function draw(ed) {
   const text = ed.ta.value;
   // Only PubMed syntax becomes a link. Ovid, EBSCO and Cochrane notations stay plain text.
   ed.terms = parseText(text).filter(isPubMed);
+  // A message about a term goes away once that term is corrected or removed from the box.
+  ed.notes.querySelectorAll('.mesh-note[data-key]').forEach(n => {
+    if (!ed.terms.some(t => normLabel(t.label) === n.dataset.key)) n.remove();
+  });
   let html = '', pos = 0;
   ed.terms.forEach((t, i) => {
     const st = termState(t);
@@ -638,9 +642,10 @@ function hideTip() { tipFor = null; if (tip) tip.hidden = true; }
 // ---------------------------------------------------------------------------
 // Opening a record (FR-1, FR-7, FR-8, FR-10) and messages
 // ---------------------------------------------------------------------------
-function note(ed, html, cls) {
+function note(ed, html, cls, t) {
   const n = document.createElement('div');
   n.className = 'mesh-note ' + (cls || '');
+  if (t) n.dataset.key = normLabel(t.label);
   n.innerHTML = html + '<button type="button" class="mesh-x" aria-label="Close message">×</button>';
   ed.notes.prepend(n);
   while (ed.notes.children.length > 3) ed.notes.lastChild.remove();
@@ -653,13 +658,13 @@ function actOnResult(ed, t, st, win) {
     case 'unavailable': case 'pending': return go(searchUrl(t.label));
     case 'removed':
       if (win) win.close();
-      return note(ed, `${ICONS.removed}<span><b>${esc(t.label)}</b>: ${esc(statusText(st))}. There is no record to open.</span>`, 'n-warn');
+      return note(ed, `${ICONS.removed}<span><b>${esc(t.label)}</b>: ${esc(statusText(st))}. There is no record to open.</span>`, 'n-warn', t);
     case 'notfound': {
       if (win) win.close();
       const sugg = st.suggestions && st.suggestions.length
         ? ` Did you mean: ${st.suggestions.map(s => `<button type="button" class="mesh-link" data-ui="${esc(s.ui)}">${esc(s.label)}</button>`).join(', ')}?`
         : '';
-      return note(ed, `${ICONS.notfound}<span><b>${esc(t.label)}</b>: No exact MeSH term found.${sugg}</span>`, 'n-bad');
+      return note(ed, `${ICONS.notfound}<span><b>${esc(t.label)}</b>: No exact MeSH term found.${sugg}</span>`, 'n-bad', t);
     }
   }
 }

@@ -229,3 +229,23 @@ test('click-to-edit in the visualisation still works, without MeSH marks', async
     await expect(page.locator('#f-v0')).toHaveValue('Heart Failure[Mesh] OR hf[tiab] OR Aged[Mesh]');
     await expect(term(page, 'Aged')).toHaveClass(/s-found/);
 });
+
+test('messages and lines go away when you correct the term or click Clear all', async ({ page }) => {
+    await openPico(page);
+    await page.locator('#f-v0').fill('Heart Faliure[Mesh]');
+    await term(page, 'Heart Faliure').click();
+    await expect(page.locator('.mesh-note')).toContainText('No exact MeSH term found');
+    // Correct the typo: the message goes, the line turns green.
+    await page.locator('#f-v0').fill('Heart Failure[Mesh]');
+    await expect(page.locator('.mesh-note')).toHaveCount(0);
+    await expect(term(page, 'Heart Failure')).toHaveClass(/s-found/);
+    await expect(page.locator('.mesh-summary')).toHaveText('MeSH check: 1 found');
+    // Make the typo again, then Clear all: nothing of the MeSH check is left.
+    await page.locator('#f-v0').fill('Heart Faliure[Mesh]');
+    await term(page, 'Heart Faliure').click();
+    await expect(page.locator('.mesh-note')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Clear all' }).click();
+    await expect(page.locator('.mesh-note')).toHaveCount(0);
+    await expect(page.locator('.mterm')).toHaveCount(0);
+    await expect(page.locator('.mesh-summary')).toBeHidden();
+});
