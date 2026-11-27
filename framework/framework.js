@@ -252,26 +252,36 @@ function compile(st) {
   return parts.join(' ');
 }
 // Line-by-line search (multi-string): one line per filled box, a line that combines the parts of a
-// split letter, and a last line that combines the letters. Lines refer to each other as #1, #2...
+// split letter ("All of ..."), and a last line that combines the letters (the final search).
+// Lines refer to each other as #1, #2... Each line knows its concept (shown once per group), its
+// part (the sub-concept), its kind ('term', 'all' or 'final') and the colour of its concept.
 function searchLines(st) {
   const lines = [], tops = [], pre = dbOf(st).refPrefix;
-  const add = (label, q) => { lines.push({ n: lines.length + 1, ref: pre + (lines.length + 1), label, q }); return lines.length; };
+  const add = (l) => { lines.push(Object.assign({ n: lines.length + 1, ref: pre + (lines.length + 1) }, l)); return lines.length; };
   st.mn.elements.forEach((e, i) => {
     if (!e.include) return;
     const filled = conceptsOf(st, i).filter(c => c.v.trim());
     if (!filled.length) return;
-    const head = st.mn.free ? e.label : e.key + ' · ' + e.label;
-    const split = filled.length > 1;
-    const refs = filled.map(c => ({ op: c.op, n: add(split ? (st.mn.free ? e.label + ' · ' : e.key + ' · ') + (c.name.trim() || 'Concept ' + (c.s + 1)) : head, c.v.trim()) }));
-    const n = split ? add(head, refs.map((r, k) => (k ? opText(st, r.op) + ' ' : '') + pre + r.n).join(' ')) : refs[0].n;
+    const concept = st.mn.free ? e.label : e.key + ' · ' + e.label;
+    const split = filled.length > 1, from = lines.length;
+    const refs = filled.map(c => ({ op: c.op, n: add({ concept, part: split ? (c.name.trim() || 'Concept ' + (c.s + 1)) : '', kind: 'term', color: e.color, group: i, q: c.v.trim() }) }));
+    const n = split ? add({ concept, part: 'All of ' + (st.mn.free ? e.label : e.key), kind: 'all', color: e.color, group: i,
+      q: refs.map((r, k) => (k ? opText(st, r.op) + ' ' : '') + pre + r.n).join(' ') }) : refs[0].n;
+    lines[from].first = lines.length - from; // rows in this concept's group
     tops.push({ op: e.op, n });
   });
-  if (tops.length > 1) add('Combined', tops.map((t, k) => (k ? opText(st, t.op) + ' ' : '') + pre + t.n).join(' '));
+  if (tops.length > 1) add({ concept: 'Final search', part: '', kind: 'final', group: -1, first: 1, q: tops.map((t, k) => (k ? opText(st, t.op) + ' ' : '') + pre + t.n).join(' ') });
   return lines;
 }
-const linesTSV = lines => ['#\tConcept\tSearch'].concat(lines.map(l => `${l.ref}\t${l.label}\t${l.q}`)).join('\n');
-const linesTableHTML = lines => '<table class="lines-table"><thead><tr><th>#</th><th>Concept</th><th>Search</th></tr></thead><tbody>' +
-  lines.map(l => `<tr><td>${escapeHtml(l.ref)}</td><td>${escapeHtml(l.label)}</td><td>${escapeHtml(l.q)}</td></tr>`).join('') + '</tbody></table>';
+// The concept is written once, on the first row of its group, in the table and in the copied text.
+const linesTSV = lines => ['#\tConcept\tPart\tSearch'].concat(lines.map(l => `${l.ref}\t${l.first ? l.concept : ''}\t${l.part}\t${l.q}`)).join('\n');
+// Inline styles too, so the colours and the bold final line come along when pasted into Word.
+const linesTableHTML = lines => '<table class="lines-table"><thead><tr><th>#</th><th>Concept</th><th>Part</th><th>Search</th></tr></thead><tbody>' +
+  lines.map(l => {
+    if (l.kind === 'final') return `<tr class="final" style="font-weight:bold"><td>${escapeHtml(l.ref)}</td><td colspan="2">${escapeHtml(l.concept)}</td><td>${escapeHtml(l.q)}</td></tr>`;
+    const head = l.first ? `<td class="concept" rowspan="${l.first}" style="border-left:5px solid ${escapeHtml(l.color)}">${escapeHtml(l.concept)}</td>` : '';
+    return `<tr class="${l.kind}"><td>${escapeHtml(l.ref)}</td>${head}<td${l.kind === 'all' ? ' style="font-style:italic"' : ''}>${escapeHtml(l.part)}</td><td>${escapeHtml(l.q)}</td></tr>`;
+  }).join('') + '</tbody></table>';
 // Copy as a real table (for Word and Excel), with tab-separated text as the plain version.
 function copyTable(lines, fallbackInput) {
   const tsv = linesTSV(lines);
@@ -290,8 +300,10 @@ const isRefLine = q => /\d/.test(q) && q.replace(/(?:#|\bS)?\d+|\b(?:AND|OR|NOT)
 // A line that combines earlier lines with a limit, like Embase "#3 AND [english]/lim" or
 // "#4 AND [2015-2025]/py": the refs come first, then one operator and the limit.
 // Returns { refs, op, term } or null. Refs need # or S here, so "covid 19 AND ..." is never one.
+// Ovid numbers its lines without # ("5 and (english or dutch).lg."): bare numbers count only when the line starts with one.
 function splitLimitLine(q) {
-  const re = /\s*(\(|\)|(?:#|\bS)\d+|\b(?:AND|OR|NOT)\b)/giy;
+  const bare = /^\s*\(?\s*\d+\s+(?:AND|OR|NOT)\b/i.test(q);
+  const re = bare ? /\s*(\(|\)|(?:#|\bS)?\d+|\b(?:AND|OR|NOT)\b)/giy : /\s*(\(|\)|(?:#|\bS)\d+|\b(?:AND|OR|NOT)\b)/giy;
   let m, depth = 0, best = null;
   re.lastIndex = 0;
   while ((m = re.exec(q))) {
@@ -300,39 +312,85 @@ function splitLimitLine(q) {
     else if (t === ')') { if (--depth < 0) return best; }
     else if (/^(AND|OR|NOT)$/i.test(t)) {
       const prefix = q.slice(0, m.index), rest = q.slice(re.lastIndex).trim();
-      if (!depth && /[#S]\d/i.test(prefix) && rest && !isRefLine(rest)) best = { refs: prefix.trim(), op: t.toUpperCase(), term: rest };
+      if (!depth && (bare ? /\d/ : /[#S]\d/i).test(prefix) && rest && !isRefLine(rest)) best = { refs: prefix.trim(), op: t.toUpperCase(), term: rest };
     }
   }
   return best;
 }
+// The first thesaurus term in a search: Emtree 'aged'/exp, MeSH "Aged"[Mesh], Cochrane [mh "Aged"],
+// Ovid exp Aged/, EBSCO (MH "Aged+"). Returns '' when there is none.
+function thesaurusTerm(q) {
+  const res = [/'([^']+)'\/(?:exp|de|mj|syn|br)\b/i, /"([^"]+)"\s*\[(?:mesh|mh|majr)[^\]]*\]/i, /\[mh\s*\^?\s*"([^"]+)"\]/i, /\[mh\s*\^?\s*([^\]"]+)\]/i,
+    /\((?:MH|MM)\s+"([^"]+?)\+?"\)/, /(?:^|[\s(])(?:exp\s+)?\*?([A-Z][\w ,'-]*?)\/(?=[\s)]|$)/m];
+  let best = null;
+  res.forEach(re => { const m = re.exec(q); if (m && (!best || m.index < best.index)) best = { index: m.index, t: m[1] }; });
+  return best ? best.t.trim().slice(0, 60) : '';
+}
+// A name for a limit, from its field: [english]/lim is a language, [2015-2025]/py a publication year.
+function limitName(t) {
+  if (/\/py\b|\[(?:pdat|dp|py)\]|\bPUBYEAR\b|:yr\b|\.yr\.|\bPY\s*=/i.test(t)) return 'Publication year';
+  if (/\/it\b|\[pt\]|:pt\b|\.pt\.|\bDOCTYPE\b|\bDT\s*=|(?:^|[\s(])PT\s/i.test(t)) return 'Publication type';
+  if (/\[(?:english|dutch|german|french|spanish|italian|chinese|japanese)\]\/lim|\[la\]|:la\b|\.lg\.|\bLANGUAGE\b|\bLA\s*=|(?:^|[\s(])LA\s/i.test(t)) return 'Language';
+  return 'Limit';
+}
+// Split a limit at the ANDs outside brackets and quotes: "(a OR b) AND c" -> ["(a OR b)", "c"].
+function splitTopAnd(t) {
+  const out = []; let depth = 0, q = '', from = 0;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === q) q = ''; continue; }
+    if (ch === '"' || (ch === "'" && !/\w/.test(t[i - 1] || ''))) q = ch;
+    else if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (!depth && /^\sAND\s/i.test(t.slice(i, i + 5))) { out.push(t.slice(from, i).trim()); from = i + 5; i += 4; }
+  }
+  out.push(t.slice(from).trim());
+  const unwrap = x => (/^\((.*)\)$/.test(x) && splitTopAnd.balanced(x.slice(1, -1)) ? x.slice(1, -1) : x);
+  return out.filter(Boolean).map(unwrap);
+}
+splitTopAnd.balanced = x => { let d = 0; for (const ch of x) { if (ch === '(') d++; if (ch === ')' && --d < 0) return false; } return !d; };
 // Dates in a search history export, like "27 Nov 2026", "Nov 27, 2026", "2026-11-27" or "27/11/2026".
-const isDate = c => /^(\d{1,2}[\s\-/.][A-Za-z]{3,9}\.?[\s\-/.]\d{2,4}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}[/.]\d{2,4})([ T]\d{1,2}:\d{2}(:\d{2})?)?$/.test(c);
+const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+// Only real month names: Ovid's "11 NOT 14" or "3 AND 7" is a combining line, not a date.
+const DATE_RE = new RegExp('^(\\d{1,2}[\\s\\-/.]' + MONTH + '[\\s\\-/.]\\d{2,4}|' + MONTH + ' \\d{1,2},? \\d{4}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{2,4})([ T]\\d{1,2}:\\d{2}(:\\d{2})?)?$', 'i');
+const isDate = c => DATE_RE.test(c);
 function parseLineSearch(text) {
   let rows = String(text || '').split(/\r?\n/).map(r => r.split('\t').map(c => c.trim())).filter(r => r.some(Boolean));
   if (!rows.length) return 'Paste a search first.';
   // A header row (from our own table, Excel or PubMed) names the columns. A spreadsheet may have
   // a title above it, like "Embase.com Query 18/06/2026": rows before the header are left out.
-  let qCol = -1, nCol = -1;
+  let qCol = -1, nCol = -1, pCol = -1;
   const isSearchHead = c => /^(query|search terms?|zoekterm(en)?|zoekopdracht|search)$/.test(c);
   const hi = rows.slice(0, 4).findIndex(r => r.filter(Boolean).length > 1 && r.some(c => isSearchHead(c.toLowerCase())) && !r.some(c => isRefLine(c)));
   if (hi >= 0) {
     const head = rows[hi].map(c => c.toLowerCase());
     qCol = head.indexOf('query') >= 0 ? head.indexOf('query') : head.findIndex(isSearchHead);
     nCol = head.findIndex(c => /^(concept|name|naam|element|description)$/.test(c));
+    pCol = head.findIndex(c => /^(part|deel|sub-?concept)$/.test(c));
     rows = rows.slice(hi + 1);
   }
   // Without a header: a title line above numbered lines is not a search line either.
   const numbered = r => /^(?:#|S)?\d+(?:[.):]|\s|$)/i.test(r.find(Boolean) || '');
   while (rows.length > 2 && !numbered(rows[0]) && rows.slice(1).every(numbered)) rows = rows.slice(1);
   // Spreadsheets copy empty leading cells (column A left blank): drop the columns that are empty in every row.
-  while (rows.length && rows.every(r => !r[0]) && rows.every(r => r.length > 1)) { rows = rows.map(r => r.slice(1)); if (qCol > 0) qCol--; if (nCol > 0) nCol--; }
+  while (rows.length && rows.every(r => !r[0]) && rows.every(r => r.length > 1)) { rows = rows.map(r => r.slice(1)); if (qCol > 0) qCol--; if (nCol > 0) nCol--; if (pCol > 0) pCol--; }
   const allNumbered = rows.every(r => /^(?:#|S)?\d+(?:[.):]|\s|$)/i.test(r[0]));
+  let curConcept = '';
   const lines = rows.map((r, idx) => {
     let num = null, cells = r.slice();
     const m = cells[0].match(/^(?:#|S)?(\d+)[.):]?(?:\s+(.*))?$/i);
     if (allNumbered && m) { num = +m[1]; if (m[2]) cells[0] = m[2]; else cells.shift(); }
     let q, name = '';
-    if (qCol >= 0) { q = r[qCol] || ''; name = nCol >= 0 ? r[nCol] || '' : ''; }
+    if (qCol >= 0) {
+      q = r[qCol] || ''; name = nCol >= 0 ? r[nCol] || '' : '';
+      // Our own table writes the concept once per group, and the sub-concept in Part:
+      // a part line takes its part's name, an "All of ..." line the concept's name.
+      if (pCol >= 0) {
+        if (name) curConcept = name;
+        const part = r[pCol] || '';
+        name = part && !/^all of\b/i.test(part) ? part : curConcept;
+      }
+    }
     else {
       // Drop result counts, times and empty cells; the last cell left is the search, the one before it its name.
       cells = cells.filter(c => c && !/^[\d.,\s]+$/.test(c) && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(c) && !isDate(c));
@@ -392,8 +450,11 @@ function parseLineSearch(text) {
     if (!parts) { const l = lineOf(node.ref); return l ? l.q : ''; }
     return parts.map((x, k) => (k ? x.op + ' ' : '') + (parts.length > 1 ? '(' + textOf(x, depth + 1) + ')' : textOf(x, depth + 1))).join(' ');
   };
-  const nameOf = node => { if (node.term) return 'Limit'; const l = node.ref ? byNum.get(node.ref) : null; return l ? l.name : ''; };
+  const nameOf = node => { if (node.name) return node.name; if (node.term) return limitName(node.term); const l = node.ref ? byNum.get(node.ref) : null; return l ? l.name : ''; };
 
+  // A box without a name is named after its line in the pasted search ("Line 6"). "Line", not "#6",
+  // because the boxes get new numbers in our own line-by-line table.
+  const subName = node => nameOf(node) || (node.ref ? 'Line ' + node.ref : '');
   const refLines = lines.filter(l => l.ref);
   // The final line is the combining line with the highest number: Embase lists its history newest first.
   const last = refLines.reduce((a, l) => (!a || l.num > a.num ? l : a), null);
@@ -410,16 +471,112 @@ function parseLineSearch(text) {
     if (!inner || !andNot(inner)) break;
     top = inner.concat(top.slice(1)); opened = true;
   }
-  if (opened) top = [top[0]].concat(top.slice(1).filter(t => t.op !== 'NOT'), top.slice(1).filter(t => t.op === 'NOT'));
+  // Then the limits go in one Limits block and the NOT parts in one Exclude block, each with a
+  // sub-concept per limit or line: A AND (L1 AND L2 NOT L3) NOT (E1 OR E2) is the same search as
+  // A AND L1 AND L2 NOT L3 NOT E1 NOT E2. Without an AND limit, NOT limits go in Exclude too.
+  if (opened) {
+    const rest = top.slice(1);
+    const andLim = rest.filter(t => t.term && t.op !== 'NOT').flatMap(t => splitTopAnd(t.term).map(term => ({ op: 'AND', term })));
+    let notLim = rest.filter(t => t.term && t.op === 'NOT');
+    const notRefs = rest.filter(t => !t.term && t.op === 'NOT');
+    const part = (p, op) => Object.assign({}, p, { op, name: p.term ? limitName(p.term) : subName(p) });
+    const block = (op, name, parts) => (parts.length === 1 ? Object.assign({}, parts[0], { op, name, limits: true })
+      : { op, name, limits: true, group: parts.map((p, k) => Object.assign({}, p, { op: k ? p.op : 'AND' })) });
+    top = [top[0]].concat(rest.filter(t => !t.term && t.op !== 'NOT'));
+    if (andLim.length) { top.push(block('AND', 'Limits', andLim.map(p => part(p, 'AND')).concat(notLim.map(p => part(p, 'NOT'))))); notLim = []; }
+    const excl = notRefs.concat(notLim).map(p => part(p, 'OR'));
+    if (excl.length) top.push(block('NOT', 'Exclude', excl));
+  }
   const concepts = top.map(t => {
     const parts = partsOf(t, 0);
-    if (!parts) return { name: nameOf(t), v: textOf(t), more: [], limit: !!t.term };
-    return { name: nameOf(t), first: nameOf(parts[0]), v: textOf(parts[0], 1),
-      more: parts.slice(1).map(x => ({ name: nameOf(x), op: x.op, v: textOf(x, 1) })) };
+    if (!parts) return { name: nameOf(t), v: textOf(t), more: [], limit: !!(t.term || t.limits) };
+    return { name: nameOf(t), first: subName(parts[0]), v: textOf(parts[0], 1), limit: !!t.limits,
+      more: parts.slice(1).map(x => ({ name: subName(x), op: x.op, v: textOf(x, 1) })) };
+  });
+  // A concept without a name is named after its first thesaurus term: 'aged'/de -> aged.
+  const used = new Set(concepts.map(c => c.name).filter(Boolean));
+  concepts.forEach(c => {
+    if (c.name || c.limit) return;
+    const t = thesaurusTerm([c.v].concat(c.more.map(m => m.v)).join(' '));
+    if (!t) return;
+    let name = t, k = 2;
+    while (used.has(name)) name = t + ' ' + k++;
+    used.add(name); c.name = name;
   });
   if (missing !== null) return 'A line refers to #' + missing + ', but there is no line ' + missing + ' in the pasted text.';
   if (!concepts.some(c => c.v.trim())) return 'No search lines found in the pasted text.';
   return { concepts, ops: top.map(t => t.op) };
+}
+// The line-by-line example ("Load line-by-line example"), written as a search history in the syntax
+// of the chosen database: three concepts split over several lines and combined with OR, then with AND,
+// exclusions with NOT, and limits (publication type, language, year) on the last lines.
+// Web of Science and Scopus have no subject headings, so their concepts are free text only.
+const LX = {
+  aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*', 'older people', 'geriatric*'] },
+  rti: { mesh: 'Respiratory Tract Infections', emtree: 'respiratory tract infection', cinahl: 'Respiratory Tract Infections', explode: true, words: ['pneumonia', 'bronchiolitis'],
+    prox: [['respirat*', 'lung*', 'airway*'], ['infect*', 'viral*', 'bacteria*']] },
+  frail: { mesh: 'Frailty', emtree: 'frailty', cinahl: 'Frailty', words: ['frail*', 'vulnerab*', 'predispos*'] },
+  animals: { pubmed: '"Animals"[Mesh] NOT "Humans"[Mesh]', embase: "'animal'/exp NOT 'human'/exp", ovid: 'exp Animals/ NOT Humans/',
+    ebsco: '(MH "Animals+") NOT (MH "Human")', cochrane: '[mh Animals] NOT [mh Humans]', wos: 'TI=(mice OR mouse OR rat OR rats)', scopus: 'TITLE(mice OR mouse OR rat OR rats)' },
+  hospital: { pubmed: '"Cross Infection"[Mesh]', embase: "'hospital infection'/exp", ovid: 'exp Cross Infection/', ebsco: '(MH "Cross Infection+")',
+    cochrane: '[mh "Cross Infection"]', wos: 'TI=(nosocomial OR "hospital acquired")', scopus: 'TITLE(nosocomial OR "hospital acquired")' },
+  // Limits: [operator, text]; a database without a search field for a limit leaves it out.
+  limits: {
+    pubmed: [['NOT', '(case reports[pt] OR preprint[pt])'], ['AND', '(english[la] OR dutch[la])'], ['AND', '2020:2026[dp]']],
+    embase: [['NOT', "('conference abstract'/it OR 'conference review'/it OR 'preprint'/it)"], ['AND', '([dutch]/lim OR [english]/lim)'], ['AND', '[2020-2026]/py']],
+    ovid: [['NOT', '(case reports OR preprint).pt.'], ['AND', '(english OR dutch).lg.'], ['AND', '(2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025 OR 2026).yr.']],
+    ebsco: [['NOT', 'PT ("Case Study" OR "Editorial")'], ['AND', 'LA (English OR Dutch)']],
+    cochrane: [['NOT', '"conference abstract":pt'], ['AND', '(english:la OR dutch:la)']],
+    wos: [['NOT', 'DT=(Meeting Abstract OR Editorial Material)'], ['AND', 'LA=(English OR Dutch)'], ['AND', 'PY=(2020-2026)']],
+    scopus: [['NOT', 'DOCTYPE(cp OR cr)'], ['AND', 'LANGUAGE(english OR dutch)'], ['AND', 'PUBYEAR > 2019']]
+  }
+};
+// The lines of one concept in a database: the subject heading, a proximity line, the free-text words.
+function lxConcept(c, db) {
+  const dq = x => (/ /.test(x) ? '"' + x + '"' : x), or = (l, f) => l.map(f || (x => x)).join(' OR ');
+  const ph = x => (/ /.test(x) ? "'" + x + "'" : x);
+  const out = [];
+  const head = { pubmed: `"${c.mesh}"[Mesh]`, embase: `'${c.emtree}'/exp`, ovid: (c.explode ? 'exp ' : '') + c.mesh + '/',
+    ebsco: `(MH "${c.cinahl}${c.explode ? '+' : ''}")`, cochrane: `[mh ${/ /.test(c.mesh) ? '"' + c.mesh + '"' : c.mesh}]` }[db];
+  if (head) out.push(head);
+  if (c.prox) {
+    const [a, b] = c.prox.map(l => '(' + or(l) + ')');
+    out.push({ pubmed: or(['respiratory infection', 'lung infection', 'airway infection'], x => `"${x}"[tiab:~3]`),
+      embase: `(${a} NEAR/3 ${b}):ti,ab,kw`, ovid: `(${a} adj3 ${b}).ti,ab.`, ebsco: `TI (${a} N3 ${b}) OR AB (${a} N3 ${b})`,
+      cochrane: `(${a} NEAR/3 ${b}):ti,ab,kw`, wos: `TS=(${a} NEAR/3 ${b})`, scopus: `TITLE-ABS-KEY(${a} W/3 ${b})` }[db]);
+  }
+  const w = c.words;
+  out.push({ pubmed: or(w, x => dq(x) + '[tiab]'), embase: or(w, x => ph(x) + ':ti,ab,kw'), ovid: '(' + or(w) + ').ti,ab.',
+    ebsco: `TI (${or(w, dq)}) OR AB (${or(w, dq)})`, cochrane: '(' + or(w, dq) + '):ti,ab,kw', wos: 'TS=(' + or(w, dq) + ')',
+    scopus: 'TITLE-ABS-KEY(' + or(w, dq) + ')' }[db]);
+  return out;
+}
+function linesExample(db) {
+  db = msDb(db).id;
+  const pre = msDb(db).refPrefix, not = msDb(db).notOp, rows = [];
+  const add = q => { rows.push(q); return pre + rows.length; };
+  const orLine = refs => (refs.length > 1 ? add(refs.join(' OR ')) : refs[0]);
+  const tops = ['aged', 'rti', 'frail'].map(k => orLine(lxConcept(LX[k], db).map(add)));
+  let last = add(tops.join(' AND '));
+  const excl = orLine([add(LX.animals[db]), add(LX.hospital[db])]);
+  last = add(last + ' ' + not + ' ' + excl);
+  LX.limits[db].forEach(([op, t]) => { last = add(last + ' ' + (op === 'NOT' ? not : op) + ' ' + t); });
+  return rows.map((q, i) => pre + (i + 1) + '\t' + q).join('\n');
+}
+// Load it, and remember the database it was written for: an unchanged example follows the database.
+function loadLinesExample(st) {
+  const parsed = parseLineSearch(linesExample(st.db));
+  if (typeof parsed === 'string') return null; // could not be read: leave the boxes as they are
+  applyLineSearch(st, parsed);
+  st.demo = null; st.linesDemo = st.db;
+  return parsed;
+}
+function sameAsLinesExample(st, db) {
+  const t = { db, mn: freeMnemonic(1), values: [], subs: [] };
+  applyLineSearch(t, parseLineSearch(linesExample(db)));
+  const norm = x => JSON.stringify({ l: x.mn.elements.map(e => [e.label, e.op]), v: x.values.map(v => (v || '').trim()),
+    s: x.subs.map(u => ({ n: u.name, m: u.more.map(m => [m.name, m.op, (m.v || '').trim()]) })) });
+  return !!st.mn.free && norm(t) === norm(st);
 }
 // Put a parsed search in the boxes. It keeps the framework when the concepts fit its letters;
 // otherwise it continues without a framework, with one named block per concept.
@@ -589,9 +746,10 @@ function renderEditor(root, oid, st) {
       <div class="btn-row lines-actions">
         <button type="button" class="btn" data-act="copy-table">Copy table</button>
         <button type="button" class="btn" data-act="paste-table">Paste a line-by-line search…</button>
+        <button type="button" class="btn" data-act="lines-example">Load line-by-line example</button>
       </div>
       <div class="paste-box" hidden>
-        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}. Lines like <code>#1 AND #2</code>, <code>S1 AND S2</code> or <code>or/1-3</code> tell the tool how the lines are combined. Limit lines like <code>#3 AND [english]/lim</code> become blocks of their own.</label>
+        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}.</label>
         <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
         <p class="err" hidden></p>
         <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
@@ -629,6 +787,8 @@ function renderEditor(root, oid, st) {
     if (st.demo && st.demo.name === st.mn.name && EXAMPLES[st.mn.name] && sameAsDemo(st, demoFor(st.mn.name, from))) {
       loadDemo(st, demoFor(st.mn.name, st.db));
       st.demo.db = st.db;
+    } else if (st.linesDemo === from && sameAsLinesExample(st, from)) {
+      loadLinesExample(st);
     }
     renderEditor(root, oid, st);
     qs(root, `#${oid}-db`).focus();
@@ -750,6 +910,13 @@ function renderEditor(root, oid, st) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.act === 'copy-table') { const l = searchLines(st); if (!l.length) return toast('Fill in at least one box first.'); copyTable(l, qs(root, `#${oid}-linkbox`)); }
     if (b.dataset.act === 'paste-table') { openPaste(); qs(pasteBox, 'textarea').focus(); }
+    // The example is a search history in the chosen database's syntax.
+    if (b.dataset.act === 'lines-example') {
+      try { localStorage.setItem(LINES_KEY, '1'); } catch (err) { /* storage blocked */ }
+      if (!loadLinesExample(st)) return toast('The line-by-line example for ' + dbOf(st).label + ' could not be read.');
+      renderApp();
+      toast('Loaded a line-by-line example in ' + dbOf(st).label + ' syntax: 3 concepts, exclusions and limits.');
+    }
   });
   const readSearch = text => {
     const parsed = parseLineSearch(text);

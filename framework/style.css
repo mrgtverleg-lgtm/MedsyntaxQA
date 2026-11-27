@@ -279,6 +279,10 @@ html.greyscale { filter: grayscale(100%); }
 .lines-table th, .lines-table td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
 .lines-table th { background: var(--surface); font-weight: 600; }
 .lines-table td:first-child { white-space: nowrap; font-family: var(--font-code); }
+.lines-table td.concept { font-weight: 600; background: var(--surface); }
+.lines-table tr.all td { background: var(--surface-2); color: var(--muted); }
+.lines-table tr.all td:last-child { color: inherit; }
+.lines-table tr.final td { border-top: 2px solid var(--ink); font-weight: 700; }
 .lines-table td:last-child { font-family: var(--font-code); overflow-wrap: anywhere; }
 .paste-box { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: .88rem; }
 .paste-box[hidden] { display: none; }

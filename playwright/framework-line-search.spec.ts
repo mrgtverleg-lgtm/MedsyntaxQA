@@ -25,7 +25,7 @@ const EMBASE = [
     ['#4', '#3 AND [english]/lim', '10,000', '27 Nov 2026'],
     ['#5', '#4 AND [2015-2025]/py', '8,000', '27 Nov 2026'],
 ];
-const FULL = "('diabetes mellitus'/exp OR diabet*:ti,ab,kw) AND ('exercise'/exp OR (physical NEXT/2 activit*):ti,ab) AND ([english]/lim) AND ([2015-2025]/py)";
+const FULL = "('diabetes mellitus'/exp OR diabet*:ti,ab,kw) AND ('exercise'/exp OR (physical NEXT/2 activit*):ti,ab) AND (([english]/lim) AND ([2015-2025]/py))";
 
 async function openPicoEmbase(page) {
     await page.goto(URL);
@@ -53,9 +53,10 @@ test('Embase history with limit lines keeps the limits', async ({ page }) => {
     await openPicoEmbase(page);
     await pasteSearch(page, [['No.', 'Query', 'Results', 'Date']].concat(EMBASE).map(r => r.join('\t')).join('\n'));
     await expect(page.locator('.full-query')).toHaveText(FULL);
-    // Limits are never put in a PICO letter: the search becomes concept blocks.
-    await expect(page.locator('.concept-name')).toHaveCount(4);
-    await expect(page.locator('.concept-name').nth(2)).toHaveValue('Limit');
+    // Limits are never put in a PICO letter: the search becomes concept blocks, with the limits in one block.
+    await expect(page.locator('.concept-name')).toHaveCount(3);
+    await expect(page.locator('.concept-name').nth(2)).toHaveValue('Limits');
+    expect(await page.locator('.field[data-i="2"] .sub-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['Language', 'Publication year']);
 });
 
 test('Embase history newest first, without a header row', async ({ page }) => {
@@ -115,8 +116,28 @@ test('Embase example from a spreadsheet gives the same search as the single stri
     await pasteSearch(page, EXAMPLE.lineByLine);
     await expect(page.locator('.paste-box .err')).toBeHidden();
     await expect(page.locator('.global-ok')).toBeVisible();
-    await expect(page.locator('.concept-name')).toHaveCount(7);
-    await expect(page.locator('.lines-table tbody tr').last()).toContainText('#5 AND #12 AND #15 AND #16 NOT #19 NOT #22 NOT #23');
+    // 3 concepts, one Limits block (language, year, NOT publication type) and one Exclude block (#20 OR #24).
+    expect(await page.locator('.concept-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['aged', 'respiratory tract infection', 'vulnerability', 'Limits', 'Exclude']);
+    expect(await page.locator('.field[data-i="3"] .sub-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['Language', 'Publication year', 'Publication type']);
+    expect(await page.locator('.field[data-i="4"] .sub-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['Line 20', 'Line 24']);
+    await expect(page.locator('.lines-table tbody tr').last()).toContainText('#5 AND #12 AND #15 AND #19 NOT #22');
+    // Boxes without a name are named after their line in the pasted search.
+    expect(await page.locator('.field[data-i="0"] .sub-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['Line 1', 'Line 2', 'Line 3', 'Line 4']);
+    // The table: #, Concept (once per group), Part, Search; "All of ..." lines and a bold Final search.
+    await expect(page.locator('.lines-table thead th')).toHaveText(['#', 'Concept', 'Part', 'Search']);
+    const first = page.locator('.lines-table tbody tr').first();
+    await expect(first.locator('td')).toHaveText(['#1', 'aged', 'Line 1', "'aged'/de OR 'very elderly'/exp"]);
+    await expect(first.locator('td.concept')).toHaveAttribute('rowspan', '5');
+    await expect(page.locator('.lines-table tr.all').first().locator('td')).toHaveText(['#5', 'All of aged', '#1 OR #2 OR #3 OR #4']);
+    await expect(page.locator('.lines-table tr.final td')).toHaveText(['#23', 'Final search', '#5 AND #12 AND #15 AND #19 NOT #22']);
+    // Copying the table and pasting it back gives the same search and the same names.
+    const fullBefore = await page.locator(".full-query").textContent();
+    await page.locator('.lines-view').getByRole('button', { name: 'Paste a line-by-line search…' }).click();
+    await page.locator('#f-paste').fill(await page.evaluate('linesTSV(searchLines(S))'));
+    await page.getByRole('button', { name: 'Read search' }).click();
+    await expect(page.locator('.full-query')).toHaveText(fullBefore || '');
+    expect(await page.locator('.concept-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['aged', 'respiratory tract infection', 'vulnerability', 'Limits', 'Exclude']);
+    expect(await page.locator('.field[data-i="3"] .sub-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value))).toEqual(['Language', 'Publication year', 'Publication type']);
     const full = await page.locator('.full-query').textContent() || '';
     const rows = EXAMPLE.lineByLine.split('\n').slice(2).map(r => r.split('\t')[1]);
     const atoms = rows.filter(q => !/#\d/.test(q)).concat(
@@ -131,4 +152,32 @@ test('a search without limits still fits PICO when the lines match its letters',
     await pasteSearch(page, ['#1\tdiabet*:ti', '#2\texercis*:ti', '#3\twalk*:ti', '#4\tglucose:ti', '#5\t#1 AND #2 AND #3 AND #4'].join('\n'));
     await expect(page.locator('.concept-name')).toHaveCount(0);
     await expect(page.locator('#f-v3')).toHaveValue('glucose:ti');
+});
+
+test('Load line-by-line example is written for the chosen database and follows a database switch', async ({ page }) => {
+    await page.goto(URL);
+    await page.locator('.card[data-id="PICO"]').click();
+    await page.locator('#f-db').selectOption('pubmed');
+    await page.locator('.lines-view > summary').click();
+    await page.locator('.lines-view').getByRole('button', { name: 'Load line-by-line example' }).click();
+    await expect(page.locator('#f-db')).toHaveValue('pubmed');
+    await expect(page.locator('.lines-view')).toHaveAttribute('open', '');
+    const names = () => page.locator('.concept-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value));
+    // PubMed: names from the MeSH terms, limits and exclusions in blocks of their own, no warnings.
+    expect(await names()).toEqual(['Aged', 'Respiratory Tract Infections', 'Frailty', 'Limits', 'Exclude']);
+    await expect(page.locator('#f-v0')).toHaveValue('"Aged"[Mesh]');
+    await expect(page.locator('.global-ok')).toBeVisible();
+    await expect(page.locator('.cbox > .warns:visible')).toHaveCount(0);
+    // Switching the database rewrites the unchanged example in the new syntax.
+    for (const [db, first] of [['embase', "'aged'/exp"], ['ovid', 'exp Aged/'], ['ebsco', '(MH "Aged+")'], ['cochrane', '[mh Aged]'], ['wos', 'TS=(elderly OR "older adult*" OR "older people" OR geriatric*)'], ['scopus', 'TITLE-ABS-KEY(elderly OR "older adult*" OR "older people" OR geriatric*)']]) {
+        await page.locator('#f-db').selectOption(db);
+        await expect(page.locator('#f-v0'), db).toHaveValue(first);
+        await expect(page.locator('.global-ok'), db).toBeVisible();
+        await expect(page.locator('.cbox > .warns:visible'), db).toHaveCount(0);
+        expect(await names(), db).toContain('Limits');
+    }
+    // Text you changed yourself stays when you switch.
+    await page.locator('#f-v0').fill('senior*:ti');
+    await page.locator('#f-db').selectOption('pubmed');
+    await expect(page.locator('#f-v0')).toHaveValue('senior*:ti');
 });
