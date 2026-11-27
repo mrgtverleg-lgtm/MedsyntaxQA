@@ -100,7 +100,7 @@ function renumberConcepts(mn) {
 // Each concept: subject headings per database (none in Web of Science and Scopus) and free-text words.
 // exampleText() writes it in one database's syntax, so the example follows the database choice.
 const EX = {
-  t2dm: { mesh: 'Diabetes Mellitus, Type 2', emtree: 'non insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 2', words: ['type 2 diabetes', 'T2DM'] },
+  t1dm: { mesh: 'Diabetes Mellitus, Type 1', emtree: 'insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 1', words: ['type 1 diabetes', 'T1DM'] },
   diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T2DM'] },
   aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*'] },
   exercise: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity', 'resistance training'] },
@@ -132,7 +132,7 @@ function exampleText(c, db) {
 const EXAMPLES = {
   'No framework': ['diabetes', 'exerciseShort'],
   // P and O are split, so the example also shows nested concepts (AND within P, OR within O).
-  PICO: [{ name: 'Type 2 diabetes', c: 't2dm', more: [{ name: 'Older adults', op: 'AND', c: 'aged' }] },
+  PICO: [{ name: 'Type 1 diabetes', c: 't1dm', more: [{ name: 'Older adults', op: 'AND', c: 'aged' }] },
          'exercise', 'usualCare',
          { name: 'Glycaemic control', c: 'hba1c', more: [{ name: 'Blood glucose', op: 'OR', c: 'glucose' }] }],
   SPIDER: ['nurses', 'handoff', 'interviews', 'experiences', 'qualitative']
