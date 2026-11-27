@@ -18,7 +18,9 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Playwright 1.60 installs its browser dependencies for Ubuntu up to 24.04 only,
+    # so pin the runner instead of using ubuntu-latest.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
