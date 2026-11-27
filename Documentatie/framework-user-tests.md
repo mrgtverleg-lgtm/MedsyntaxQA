@@ -32,6 +32,7 @@ Status: 23 November 2026, version on branch `Medsyntax-Framework`.
 | B6 | clear everything | Click **Clear all** | All boxes and the full query are empty | ☐ | |
 | B7 | load an example | PICO → **Load example** | All 4 boxes are filled with a diabetes/exercise example | ☐ | |
 | B8 | try an example where none exists | PEO → **Load example** | A message: no example for PEO yet; nothing changes | ☐ | |
+| B10 | see the example in my database | PICO → choose **Embase** → **Load example**; then switch to **Ovid** | The example is written in Embase syntax (`'aged'/exp`, `:ti,ab,kw`) without warnings; after switching it's in Ovid syntax (`exp Aged/`, `.ti,ab.`). Change one box first and switch again: your text stays as it is | ☐ | |
 | B9 | hide or show the visualisation | Close **Medsyntax visualisation** and reload; then open it and reload | It's closed by default and stays as you left it. The full query, the syntax summary and Load example, Copy query, Copy link, Download and Clear all are always visible | ☐ | |
 
 ## C. Split concept: several concepts under one letter

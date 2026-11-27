@@ -96,25 +96,73 @@ function renumberConcepts(mn) {
   });
 }
 
-const DEMOS = {
-  'No framework': ['"Diabetes Mellitus"[Mesh] OR diabet*[tiab] OR T2DM[tiab]',
-                   '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab]'],
+// ---- Examples ("Load example"), written in the syntax of the chosen database ----
+// Each concept: subject headings per database (none in Web of Science and Scopus) and free-text words.
+// exampleText() writes it in one database's syntax, so the example follows the database choice.
+const EX = {
+  t2dm: { mesh: 'Diabetes Mellitus, Type 2', emtree: 'non insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 2', words: ['type 2 diabetes', 'T2DM'] },
+  diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T2DM'] },
+  aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*'] },
+  exercise: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity', 'resistance training'] },
+  exerciseShort: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity'] },
+  usualCare: { words: ['usual care', 'standard care', 'no intervention'] },
+  hba1c: { mesh: 'Glycated Hemoglobin', emtree: 'hemoglobin A1c', cinahl: 'Hemoglobin A, Glycosylated', words: ['HbA1c', 'glycemic control'] },
+  glucose: { mesh: 'Blood Glucose', emtree: 'glucose blood level', cinahl: 'Blood Glucose', words: ['blood glucose', 'fasting glucose'] },
+  nurses: { mesh: 'Nurses', emtree: 'nurse', cinahl: 'Nurses', explode: true, words: ['nurse*', 'nursing staff'] },
+  handoff: { mesh: 'Patient Handoff', emtree: 'patient handoff', cinahl: 'Hand Off (Patient Safety)', words: ['handover*', 'handoff*', 'SBAR'] },
+  interviews: { words: ['interview*', 'focus group*', 'ethnograph*'] },
+  experiences: { words: ['experienc*', 'view*', 'perception*', 'attitude*'] },
+  qualitative: { mesh: 'Qualitative Research', emtree: 'qualitative research', cinahl: 'Qualitative Studies', explode: true, words: ['qualitative', 'mixed method*'] }
+};
+function exampleText(c, db) {
+  const w = c.words, phrase = x => / /.test(x);
+  const dq = x => (phrase(x) ? '"' + x + '"' : x);
+  const group = (list, wrap) => (list.length > 1 ? '(' + list.map(wrap).join(' OR ') + ')' : wrap(list[0]));
+  switch (db) {
+    case 'embase': return [c.emtree ? `'${c.emtree}'/exp` : null, ...w.map(x => (phrase(x) ? `'${x}'` : x.toLowerCase()) + ':ti,ab,kw')].filter(Boolean).join(' OR ');
+    case 'ovid': return [c.mesh ? (c.explode ? 'exp ' : '') + c.mesh + '/' : null, group(w, x => x) + '.ti,ab.'].filter(Boolean).join(' OR ');
+    case 'ebsco': return [c.cinahl ? `(MH "${c.cinahl}${c.explode ? '+' : ''}")` : null, 'TI ' + group(w, dq), 'AB ' + group(w, dq)].filter(Boolean).join(' OR ');
+    case 'cochrane': return [c.mesh ? `[mh ${phrase(c.mesh) ? '"' + c.mesh + '"' : c.mesh}]` : null, group(w, dq) + ':ti,ab,kw'].filter(Boolean).join(' OR ');
+    case 'wos': return 'TS=(' + w.map(dq).join(' OR ') + ')';
+    case 'scopus': return 'TITLE-ABS-KEY(' + w.map(dq).join(' OR ') + ')';
+    default: return [c.mesh ? `"${c.mesh}"[Mesh]` : null, ...w.map(x => dq(x) + '[tiab]')].filter(Boolean).join(' OR ');
+  }
+}
+// The examples per mnemonic: a concept key per letter, or { name, c, more } for a split letter.
+const EXAMPLES = {
+  'No framework': ['diabetes', 'exerciseShort'],
   // P and O are split, so the example also shows nested concepts (AND within P, OR within O).
-  PICO: [{ name: 'Type 2 diabetes', v: '"Diabetes Mellitus, Type 2"[Mesh] OR "type 2 diabetes"[tiab] OR T2DM[tiab]',
-           more: [{ name: 'Older adults', op: 'AND', v: '"Aged"[Mesh] OR elderly[tiab] OR "older adult*"[tiab]' }] },
-         '"Exercise"[Mesh] OR exercis*[tiab] OR "physical activity"[tiab] OR "resistance training"[tiab]',
-         '"usual care"[tiab] OR "standard care"[tiab] OR "no intervention"[tiab]',
-         { name: 'Glycaemic control', v: '"Glycated Hemoglobin"[Mesh] OR HbA1c[tiab] OR "glycemic control"[tiab]',
-           more: [{ name: 'Blood glucose', op: 'OR', v: '"Blood Glucose"[Mesh] OR "blood glucose"[tiab] OR "fasting glucose"[tiab]' }] }],
-  SPIDER: ['"Nurses"[Mesh] OR nurse*[tiab] OR "nursing staff"[tiab]',
-           '"Patient Handoff"[Mesh] OR handover*[tiab] OR handoff*[tiab] OR SBAR[tiab]',
-           'interview*[tiab] OR "focus group*"[tiab] OR ethnograph*[tiab]',
-           'experienc*[tiab] OR view*[tiab] OR perception*[tiab] OR attitude*[tiab]',
-           '"Qualitative Research"[Mesh] OR qualitative[tiab] OR "mixed method*"[tiab]'],
+  PICO: [{ name: 'Type 2 diabetes', c: 't2dm', more: [{ name: 'Older adults', op: 'AND', c: 'aged' }] },
+         'exercise', 'usualCare',
+         { name: 'Glycaemic control', c: 'hba1c', more: [{ name: 'Blood glucose', op: 'OR', c: 'glucose' }] }],
+  SPIDER: ['nurses', 'handoff', 'interviews', 'experiences', 'qualitative']
+};
+// Fixed examples that don't follow the database (written in EBSCO syntax).
+const DEMOS = {
   LSI: ['librarian* OR "information specialist" OR informationist* OR "information professional" OR "knowledge worker" OR "information scientist*" OR "information services"',
         'librar* AND (medical OR academic OR research OR special OR college OR junior )',
         'DE "library orientation" OR DE "learning" OR DE "information services" OR "User education" OR instruct* OR educat* OR orient* OR teach* OR curricul* OR train* OR pedagog* OR tutor* OR lesson* OR lectur* OR learn * OR webinar*']
 };
+// Put an example in the boxes, and check whether the boxes still hold that example unchanged.
+function loadDemo(st, d) {
+  st.values = st.mn.elements.map((_, i) => (d[i] && typeof d[i] === 'object' ? d[i].v : d[i]) || '');
+  st.subs = st.mn.elements.map((_, i) => (d[i] && typeof d[i] === 'object' ? { name: d[i].name || '', more: clone(d[i].more || []) } : emptySub()));
+}
+function sameAsDemo(st, d) {
+  if (!d) return false;
+  const t = { mn: st.mn, values: [], subs: [] };
+  loadDemo(t, d);
+  const norm = x => JSON.stringify({ v: x.values.map(v => (v || '').trim()), s: x.subs.map(u => ({ n: u.name, m: u.more.map(m => [m.name, m.op, (m.v || '').trim()]) })) });
+  return norm(t) === norm(st);
+}
+// The example for a mnemonic in a database, in the shape Load example uses: text, or { name, v, more }.
+function demoFor(name, db) {
+  if (EXAMPLES[name]) {
+    return EXAMPLES[name].map(x => (typeof x === 'string' ? exampleText(EX[x], db)
+      : { name: x.name, v: exampleText(EX[x.c], db), more: (x.more || []).map(m => ({ name: m.name, op: m.op, v: exampleText(EX[m.c], db) })) }));
+  }
+  return DEMOS[name] || null;
+}
 
 // ---- My mnemonics (browser storage, optional) ----
 const STORE_KEY = 'medsyntax.myMnemonics.v1';
@@ -520,8 +568,14 @@ function renderEditor(root, oid, st) {
   });
   // The database decides how the query is written and checked. Remembered in this browser.
   qs(root, `#${oid}-db`).addEventListener('change', e => {
+    const from = dbOf(st).id;
     st.db = msDb(e.target.value).id;
     try { localStorage.setItem(DB_KEY, st.db); } catch (err) { /* storage blocked */ }
+    // An example that is still unchanged is rewritten in the new database's syntax. Your own text never changes.
+    if (st.demo && st.demo.name === st.mn.name && EXAMPLES[st.mn.name] && sameAsDemo(st, demoFor(st.mn.name, from))) {
+      loadDemo(st, demoFor(st.mn.name, st.db));
+      st.demo.db = st.db;
+    }
     renderEditor(root, oid, st);
     qs(root, `#${oid}-db`).focus();
   });
@@ -620,13 +674,13 @@ function renderEditor(root, oid, st) {
       toast('Download started. If nothing happens, use Copy query.');
     }
     if (act === 'demo') {
-      const d = DEMOS[st.mn.name];
+      const d = demoFor(st.mn.name, dbOf(st).id);
       if (!d) return toast('No example for ' + st.mn.name + ' yet. Try PICO, SPIDER or LSI.');
       // A demo entry is the text of one letter, or { name, v, more } for a split letter.
-      st.values = st.mn.elements.map((_, i) => (typeof d[i] === 'object' ? d[i].v : d[i]) || '');
-      st.subs = st.mn.elements.map((_, i) => (d[i] && typeof d[i] === 'object' ? { name: d[i].name || '', more: clone(d[i].more || []) } : emptySub()));
+      loadDemo(st, d);
       renderEditor(root, oid, st);
-      if (dbOf(st).id !== 'pubmed') toast('The example is written for PubMed, so ' + dbOf(st).label + ' shows warnings. Choose PubMed to see it without them.');
+      st.demo = { name: st.mn.name, db: dbOf(st).id };
+      if (!EXAMPLES[st.mn.name] && dbOf(st).id !== 'ebsco') toast('The ' + st.mn.name + ' example is written in EBSCO syntax, so ' + dbOf(st).label + ' may show warnings.');
     }
     // Clear all: the text, the query title and the names of the concepts.
     if (act === 'clear') {
