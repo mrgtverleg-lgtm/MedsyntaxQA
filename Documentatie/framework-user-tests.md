@@ -155,7 +155,7 @@ Start each test with PICO and database **PubMed**. Wait about a second after typ
 | L1 ⭐ | open a MeSH record | Type `Heart Failure[Mesh]` in P. Hover over "Heart Failure", then click it | "Heart Failure" is underlined (green) with a small ↗. The hover card says "MeSH term found". The click opens https://www.ncbi.nlm.nih.gov/mesh/68006333 in a new tab | ☐ | |
 | L2 ⭐ | make a typo | Type `Heart Faliure[Mesh]` and click the term | Red wavy line. No new tab. A message: "No exact MeSH term found. Did you mean: Heart Failure?" Clicking **Heart Failure** in the message opens its record | ☐ | |
 | L3 | have several terms in one box | Type `Diabetes Mellitus[Mesh] OR Hypertension[Mesh]` and click Hypertension | Only the Hypertension record opens | ☐ | |
-| L4 | use Ovid syntax | Type `1. exp Diabetes Mellitus/` and click the term | Red wavy line. No new tab. A message: "Not PubMed syntax (Ovid notation). No page is opened." | ☐ | |
+| L4 | use Ovid syntax | Type `1. exp Diabetes Mellitus/` and click the term | Not underlined, no message; clicking places the cursor | ☐ | |
 | L5 | use a subheading | Type `"Heart Failure/drug therapy"[Majr]` and hover | Only "Heart Failure" is underlined; the card shows subheading drug therapy and major. A click opens Heart Failure | ☐ | |
 | L6 | use an entry term | Type `"Heart Attack"[mh]`, hover, click | Blue line. "Entry term of: Myocardial Infarction". The click opens the Myocardial Infarction record | ☐ | |
 | L7 | use free text | Type `heart failure[tiab]` | Not underlined; clicking places the cursor | ☐ | |
@@ -164,8 +164,8 @@ Start each test with PICO and database **PubMed**. Wait about a second after typ
 | L10 ⭐ | check nothing changes | Fill several MeSH terms, open a few records, then press Ctrl+Z / Cmd+Z in the box and click **Copy link** | The box text, full query and share link are the same as before; undo still works | ☐ | |
 | L11 | use an old MeSH term | Type `"Health Care Facilities, Manpower, and Services"[Mesh]` and hover | Orange double line. "Replaced by: Health Care Facilities Workforce and Services (since MeSH 2025)". A click opens that record | ☐ | |
 | L12 | use a deleted MeSH term | Type `"Health Food"[Mesh]` and click | Orange line. "Descriptor deleted in MeSH 2016". No new tab | ☐ | |
-| L13 | use EBSCO syntax | Type `MH "Hypertension+" OR MM "Asthma"` and click each term | Both: "Not PubMed syntax (EBSCO notation)". No new tab | ☐ | |
-| L14 | use Cochrane syntax | Type `MeSH descriptor: [Hypertension] explode all trees` and click | "Not PubMed syntax (Cochrane notation)" | ☐ | |
+| L13 | use EBSCO syntax | Type `MH "Hypertension+" OR MM "Asthma"` | Not underlined, no message | ☐ | |
+| L14 | use Cochrane syntax | Type `MeSH descriptor: [Hypertension] explode all trees` | Not underlined, no message | ☐ | |
 | L15 | use the menu | Right-click "Heart Failure" (L1) → **Copy MeSH term**, then **Copy as PubMed syntax**, then **Search in PubMed** | The clipboard holds `Heart Failure`, then `"Heart Failure"[Mesh]`; PubMed opens with that search. Right-clicking next to a term gives the normal browser menu | ☐ | |
 | L16 ⭐ | edit a MeSH term | Hold **Alt** (Option on a Mac) and click in the middle of "Heart Failure", then type `s` | The cursor is in the word, no tab opens, and the `s` appears where you clicked | ☐ | |
 | L17 | use only the keyboard | Move the cursor into "Heart Failure" with the arrow keys. Press Ctrl+Enter (Cmd+Enter on a Mac), then Shift+F10 | A line under the box says "Heart Failure: MeSH term found". Ctrl/Cmd+Enter opens the record; Shift+F10 opens the menu, which works with the arrow keys and Esc | ☐ | |

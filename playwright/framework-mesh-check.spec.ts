@@ -137,18 +137,12 @@ test('entry term, replaced and deleted descriptors', async ({ page }) => {
     await expect(page.locator('.mesh-summary')).toHaveText('MeSH check: 1 entry term, 1 replaced, 1 deleted');
 });
 
-test('Ovid, EBSCO and Cochrane MeSH notations say "Not PubMed syntax" and are not sent to NLM', async ({ page }) => {
+test('Ovid, EBSCO and Cochrane MeSH notations stay plain text and are not sent to NLM', async ({ page }) => {
     await openPico(page);
     await page.locator('#f-v0').fill('exp Diabetes Mellitus/ OR MH "Hypertension+" OR MeSH descriptor: [Asthma] explode all trees');
-    for (const t of ['Diabetes Mellitus', 'Hypertension', 'Asthma']) await expect(term(page, t)).toHaveClass(/s-nonpubmed/);
-    await term(page, 'Diabetes Mellitus').click();
-    await expect(page.locator('.mesh-note').first()).toContainText('Not PubMed syntax (Ovid notation). No page is opened.');
-    await term(page, 'Hypertension').click();
-    await expect(page.locator('.mesh-note').first()).toContainText('(EBSCO notation)');
-    await term(page, 'Asthma').click();
-    await expect(page.locator('.mesh-note').first()).toContainText('(Cochrane notation)');
-    await page.waitForTimeout(800);
-    expect(popups).toEqual([]);
+    await page.waitForTimeout(1000);
+    await expect(page.locator('.mterm')).toHaveCount(0);
+    await expect(page.locator('.mesh-summary')).toBeHidden();
     expect(apiCalls).toEqual([]);
 });
 

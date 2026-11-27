@@ -330,15 +330,15 @@ dialog.choose .btn-row { justify-content: flex-end; }
 .mterm.s-found { --mc: var(--mesh-ok); }
 .mterm.s-entry { --mc: var(--mesh-info); }
 .mterm.s-replaced, .mterm.s-removed { --mc: var(--mesh-warn); text-decoration-style: double; }
-.mterm.s-notfound, .mterm.s-nonpubmed { --mc: var(--mesh-err); text-decoration-style: wavy; text-decoration-thickness: 1.5px; }
+.mterm.s-notfound { --mc: var(--mesh-err); text-decoration-style: wavy; text-decoration-thickness: 1.5px; }
 .mterm.s-pending, .mterm.s-unavailable { --mc: var(--mesh-na); text-decoration-style: dotted; }
-.mterm.s-nonpubmed::after, .mterm.s-removed::after, .mterm.s-notfound::after { display: none; } /* no page opens: no external-link icon */
+.mterm.s-removed::after, .mterm.s-notfound::after { display: none; } /* no page opens: no external-link icon */
 /* Alt/Option held, or a touch screen: clicks go to the box, so the cursor can be placed in a term. */
 .mesh-alt .mterm, .mesh-touch .mterm { pointer-events: none; cursor: text; }
 
 .mico { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
 .c-found { color: var(--mesh-ok); } .c-entry { color: var(--mesh-info); } .c-replaced, .c-removed { color: var(--mesh-warn); }
-.c-notfound, .c-nonpubmed { color: var(--mesh-err); } .c-unavailable, .c-pending { color: var(--mesh-na); }
+.c-notfound { color: var(--mesh-err); } .c-unavailable, .c-pending { color: var(--mesh-na); }
 
 .mesh-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: .84rem; color: var(--ink);
   background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }

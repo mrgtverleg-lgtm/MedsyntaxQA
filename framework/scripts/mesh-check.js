@@ -3,7 +3,7 @@
 // Alt+click (Option+click on a Mac) places the cursor so you can type in the term.
 // Every PubMed MeSH term is checked against the NLM MeSH API (id.nlm.nih.gov): found, entry term,
 // replaced, deleted or not found with "Did you mean" suggestions. Ovid, EBSCO and Cochrane notations
-// are recognised but never open a page ("Not PubMed syntax").
+// stay plain text: they are not links and are not checked.
 // Requirements: Documentatie/Requirements Open MeSH-termpagina vanuit zoekterm.docx.
 // The parser block (marked PARSER START/END below, with dashes) is copied unchanged from Documentatie/mesh-prototype.html.
 // License: GNU GPL v3.0
@@ -373,7 +373,7 @@ function stateOf(label) {
   if (blocked) return { status: 'unavailable', blocked: true };
   return lastFailure.get(key) || { status: 'pending' };
 }
-const termState = t => (isPubMed(t) ? stateOf(t.label) : { status: 'nonpubmed' });
+const termState = t => stateOf(t.label);
 
 // ---------------------------------------------------------------------------
 // Addresses
@@ -398,7 +398,6 @@ const ICONS = {
   pending: '<svg class="mico c-pending" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="4 3"/></svg>'
 };
 ICONS.removed = ICONS.replaced.replace('c-replaced', 'c-removed');
-ICONS.nonpubmed = ICONS.notfound.replace('c-notfound', 'c-nonpubmed');
 
 
 function statusText(st) {
@@ -408,7 +407,6 @@ function statusText(st) {
     case 'replaced': return `Replaced by: ${st.label} (since MeSH ${st.year})`;
     case 'removed': return `Descriptor deleted in MeSH ${st.year}`;
     case 'notfound': return 'No exact MeSH term found';
-    case 'nonpubmed': return 'Not PubMed syntax';
     case 'unavailable': return st.blocked ? 'MeSH check not available in this version' : (st.offline ? 'Check not available (offline)' : 'Check not available');
     default: return 'Checking…';
   }
@@ -438,12 +436,13 @@ function syncBox(ed) {
 
 function draw(ed) {
   const text = ed.ta.value;
-  ed.terms = parseText(text);
+  // Only PubMed syntax becomes a link. Ovid, EBSCO and Cochrane notations stay plain text.
+  ed.terms = parseText(text).filter(isPubMed);
   let html = '', pos = 0;
   ed.terms.forEach((t, i) => {
     const st = termState(t);
     html += esc(text.slice(pos, t.start));
-    html += `<span class="mterm s-${st.status}${isPubMed(t) ? '' : ' s-other'}" data-i="${i}">${esc(text.slice(t.start, t.end))}</span>`;
+    html += `<span class="mterm s-${st.status}" data-i="${i}">${esc(text.slice(t.start, t.end))}</span>`;
     pos = t.end;
   });
   ed.layer.innerHTML = html + esc(text.slice(pos)) + '\n';
@@ -584,7 +583,7 @@ function updateStatus(ed) {
   if (i < 0) { if (!ed.status.hidden) { ed.status.hidden = true; ed.status.innerHTML = ''; } return; }
   const t = ed.terms[i], st = termState(t);
   const touch = document.documentElement.classList.contains('mesh-touch');
-  const what = st.status === 'nonpubmed' ? `${statusText(st)} (${t.dialect} notation)` : statusText(st);
+  const what = statusText(st);
   const html = `${ICONS[st.status] || ICONS.pending}<span><b>${esc(t.label)}</b>: ${esc(what)}.</span>
     <button type="button" class="btn small" data-open="${i}">${opens(st) ? 'Open MeSH record' : 'Show message'}</button>
     <button type="button" class="btn small ghost" data-menu="${i}" aria-label="More actions for ${esc(t.label)}">⋯</button>
@@ -610,17 +609,16 @@ function tipHTML(t) {
   if (st.status === 'notfound' && st.suggestions && st.suggestions.length) h += `<div>Did you mean: ${st.suggestions.map(s => `<b>${esc(s.label)}</b>`).join(', ')}?</div>`;
   if (st.status === 'unavailable' && st.blocked) h += '<div class="mesh-tip-meta">Open the GitHub Pages version to check terms. A click opens the NCBI MeSH search page.</div>';
   else if (st.status === 'unavailable') h += '<div class="mesh-tip-meta">A click opens the NCBI MeSH search page.</div>';
-  if (st.status === 'nonpubmed') h += `<div class="mesh-tip-meta">${esc(t.dialect)} notation. No page is opened.</div>`;
   h += '</div>';
   h += '</div>';
-  if (st.status !== 'nonpubmed') {
+  {
     const bits = [];
     if (t.subheading) bits.push('subheading: ' + esc(t.subheading));
     bits.push(t.explode ? 'explode' : 'no explode');
     if (t.major) bits.push('major');
     h += `<div class="mesh-tip-meta">${bits.join(' · ')}</div>`;
   }
-  h += `<div class="mesh-tip-hint">${st.status === 'nonpubmed' ? 'Click for the message' : 'Click to open'} · <kbd>Alt</kbd>/<kbd>⌥</kbd>+click to edit · right-click for menu</div>`;
+  h += `<div class="mesh-tip-hint">Click to open · <kbd>Alt</kbd>/<kbd>⌥</kbd>+click to edit · right-click for menu</div>`;
   return h;
 }
 function showTip(ed, i, rect) {
@@ -647,9 +645,6 @@ function note(ed, html, cls) {
   ed.notes.prepend(n);
   while (ed.notes.children.length > 3) ed.notes.lastChild.remove();
 }
-function nonPubMedNote(ed, t) {
-  note(ed, `${ICONS.nonpubmed}<span><b>${esc(t.label)}</b>: Not PubMed syntax (${esc(t.dialect)} notation). No page is opened.</span>`, 'n-bad');
-}
 
 function actOnResult(ed, t, st, win) {
   const go = url => { if (win) { try { win.location.href = url; return; } catch (e) { /* closed */ } } window.open(url, '_blank', 'noopener'); };
@@ -671,7 +666,6 @@ function actOnResult(ed, t, st, win) {
 
 function openTerm(ed, i) {
   const t = ed.terms[i]; if (!t) return;
-  if (!isPubMed(t)) return nonPubMedNote(ed, t);
   const key = normLabel(t.label);
   if (cache.has(key)) return actOnResult(ed, t, cache.get(key), null);
   if (blocked || navigator.onLine === false) return actOnResult(ed, t, { status: 'unavailable' }, null);
@@ -704,7 +698,7 @@ function menuEl() {
       case 'open': openTerm(ed, i); break;
       case 'copy': copy(descLabel); break;
       case 'copypm': copy(pubmedSyntax(descLabel)); break;
-      case 'pubmed': if (!isPubMed(t)) { nonPubMedNote(ed, t); break; } window.open(pubmedUrl(pubmedSyntax(descLabel, t)), '_blank', 'noopener'); break;
+      case 'pubmed': window.open(pubmedUrl(pubmedSyntax(descLabel, t)), '_blank', 'noopener'); break;
     }
   });
   menu.addEventListener('keydown', e => {
@@ -763,7 +757,7 @@ function checkSoon() {
   checkTimer = setTimeout(() => {
     prune();
     // Only the label goes to NLM, never the search (NFR-4). Other notations are never sent.
-    editors.forEach(ed => ed.terms.forEach(t => { if (isPubMed(t)) validate(t.label); }));
+    editors.forEach(ed => ed.terms.forEach(t => validate(t.label)));
   }, DEBOUNCE_MS);
 }
 
@@ -790,7 +784,7 @@ function summary(root) {
   editors.forEach(ed => {
     if (!root.contains(ed.ta)) return;
     ed.terms.forEach(t => {
-      const key = t.dialect + ':' + normLabel(t.label);
+      const key = normLabel(t.label);
       if (seen.has(key)) return;
       seen.add(key);
       const s = termState(t).status;
@@ -798,7 +792,7 @@ function summary(root) {
     });
   });
   const parts = [['found', 'found'], ['entry', 'entry term', 'entry terms'], ['replaced', 'replaced'], ['removed', 'deleted'],
-    ['notfound', 'not found'], ['nonpubmed', 'not PubMed syntax'], ['pending', 'checking'], ['unavailable', 'not checked']]
+    ['notfound', 'not found'], ['pending', 'checking'], ['unavailable', 'not checked']]
     .filter(([k]) => n[k]).map(([k, one, more]) => `${n[k]} ${n[k] > 1 && more ? more : one}`);
   el.hidden = !parts.length;
   el.textContent = parts.length ? 'MeSH check: ' + parts.join(', ') : '';
