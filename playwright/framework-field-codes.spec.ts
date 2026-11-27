@@ -50,6 +50,22 @@ const SHOULD_WARN: [string, string, string, string][] = [
     ['wos', 'T=(diabet*)', 'field-tag', '“T=”'],
     ['pubmed', 'diabet*[tia]', 'field-tag', '[tia]'],
     ['scopus', 'TITLE-ABS-KY(diabet*)', 'field-tag', 'TITLE-ABS-KY'],
+    // PsycINFO via Ovid: APA PsycInfo field codes, so a typo in .ti,ab,id. is still caught.
+    ['psycovid', 'anxiet*.ti,ab,i.', 'field-tag', '“i” in “.ti,ab,i.”'],
+    ['psycovid', 'anxiet*:ti,ab', 'wrong-db', 'anxiet*.ti,ab,id.'],
+    // PsycINFO via EBSCO: subject headings are DE, not MH as in CINAHL.
+    ['psycebsco', '(MH "Anxiety") OR TI anxiet*', 'field-tag', 'DE "Anxiety"'],
+    ['psycebsco', "'anxiety'/exp", 'wrong-db', 'DE "Anxiety"'],
+    // Europe PMC: FIELD:term in capitals, proximity as "phrase"~N.
+    ['europepmc', 'TITEL_ABS:diabet*', 'field-tag', '“TITEL_ABS:”'],
+    ['europepmc', 'diabet*[tiab]', 'wrong-db', 'TITLE_ABS:diabet*'],
+    ['europepmc', '"Diabetes Mellitus"[Mesh]', 'wrong-db', 'MESH_HEADING:"diabetes mellitus"'],
+    ['europepmc', 'hand NEAR/3 hygiene', 'wrong-db', 'TITLE_ABS:"hand hygiene"~3'],
+    ['europepmc', 'diabet*:ti,ab,kw', 'wrong-db', 'TITLE_ABS:diabet*'],
+    ['europepmc', 'diabet$', 'wildcard', 'Europe PMC uses *'],
+    ['pubmed', 'TITLE_ABS:diabet*', 'wrong-db', 'Europe PMC syntax'],
+    ['pubmed', 'MESH_HEADING:"Diabetes Mellitus"', 'wrong-db', '"Diabetes Mellitus"[Mesh]'],
+    ['embase', 'PUB_YEAR:[2020 TO 2026]', 'wrong-db', '[english]/lim'],
 ];
 
 // [database, query]: correct syntax, no warnings at all.
@@ -64,6 +80,13 @@ const NO_WARNING: [string, string][] = [
     ['pubmed', '("Hand Hygiene"[Mesh] OR handwash*[tiab]) AND review[pt:noexp] AND 2020[epdat]'],
     ['wos', 'TS=("hand hygiene" OR handwash*) AND TI=(compliance)'],
     ['scopus', 'TITLE-ABS-KEY("hand hygiene" OR handwash*) AND REFPAGE(12)'],
+    ['psycovid', '(exp Anxiety/ OR (social adj3 anxiet*).ti,ab,id.) AND (cognitive behavio?ral therap*.mp. OR test anxiety.tm.)'],
+    ['psycovid', 'animal.po. AND (english OR dutch).lg. AND adolescence.ag. AND 2020.yr.'],
+    ['psycebsco', '(DE "Anxiety") OR (MJ "Social Anxiety") OR TI (social N3 anxiet*) OR AB anxiet* OR KW anxiet*'],
+    ['europepmc', '(MESH_HEADING:"Hand Hygiene" OR TITLE_ABS:"hand hygiene"~3 OR TITLE_ABS:(handwash* OR "hand washing")) AND PUB_YEAR:[2020 TO 2026]'],
+    ['europepmc', 'TITLE:diabet?s AND (AUTH:"Smith J" OR KW:insulin) AND LANG:eng NOT SRC:PPR AND OPEN_ACCESS:y'],
+    // Uppercase Embase and Cochrane codes are not read as Europe PMC fields.
+    ['cochrane', 'DIABETES:TI,AB'],
 ];
 
 for (const [db, query, key, text] of SHOULD_WARN) {

@@ -308,6 +308,14 @@ dialog.choose::backdrop { background: rgb(0 0 0 / .45); }
 dialog.choose p { margin: 0 0 14px; line-height: 1.45; }
 dialog.choose .btn-row { justify-content: flex-end; }
 
+/* "Under construction" notice, shown on start-up until it is dismissed (framework.js, boot). */
+dialog.wip-notice h2 { font-size: 1.15rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+dialog.wip-notice .wip-report { color: var(--muted); font-size: .9rem; }
+dialog.wip-notice .wip-report a { color: var(--accent); }
+.wip-crab { font-size: 1.6rem; line-height: 1; display: inline-block; animation: wip-crab-walk 1.6s ease-in-out infinite alternate; }
+@keyframes wip-crab-walk { from { transform: translateX(-3px) rotate(-6deg); } to { transform: translateX(3px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .wip-crab { animation: none; } }
+
 /* MeSH check (scripts/mesh-check.js): MeSH terms in the boxes are links to their NCBI MeSH record.
    The box shows its own text; a see-through layer on top draws the underline, the icon and the click areas.
    Status is never shown by colour alone: the line style differs too, and the hover card and status line say it in words. */

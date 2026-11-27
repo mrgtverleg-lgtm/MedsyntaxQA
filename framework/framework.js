@@ -98,21 +98,22 @@ function renumberConcepts(mn) {
 
 // ---- Examples ("Load example"), written in the syntax of the chosen database ----
 // Each concept: subject headings per database (none in Web of Science and Scopus) and free-text words.
+// apa is the APA Thesaurus term for PsycINFO; a concept without one is searched as free text there.
 // exampleText() writes it in one database's syntax, so the example follows the database choice.
 const EX = {
-  t1dm: { mesh: 'Diabetes Mellitus, Type 1', emtree: 'insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 1', words: ['type 1 diabetes', 'T1DM'] },
-  diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T1DM'] },
+  t1dm: { mesh: 'Diabetes Mellitus, Type 1', emtree: 'insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 1', apa: 'Type 1 Diabetes', words: ['type 1 diabetes', 'T1DM'] },
+  diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', apa: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T1DM'] },
   aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*'] },
-  exercise: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity', 'resistance training'] },
-  exerciseShort: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity'] },
+  exercise: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', apa: 'Exercise', explode: true, words: ['exercis*', 'physical activity', 'resistance training'] },
+  exerciseShort: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', apa: 'Exercise', explode: true, words: ['exercis*', 'physical activity'] },
   usualCare: { words: ['usual care', 'standard care', 'no intervention'] },
   hba1c: { mesh: 'Glycated Hemoglobin', emtree: 'hemoglobin A1c', cinahl: 'Hemoglobin A, Glycosylated', words: ['HbA1c', 'glycemic control'] },
   glucose: { mesh: 'Blood Glucose', emtree: 'glucose blood level', cinahl: 'Blood Glucose', words: ['blood glucose', 'fasting glucose'] },
-  nurses: { mesh: 'Nurses', emtree: 'nurse', cinahl: 'Nurses', explode: true, words: ['nurse*', 'nursing staff'] },
+  nurses: { mesh: 'Nurses', emtree: 'nurse', cinahl: 'Nurses', apa: 'Nurses', explode: true, words: ['nurse*', 'nursing staff'] },
   handoff: { mesh: 'Patient Handoff', emtree: 'patient handoff', cinahl: 'Hand Off (Patient Safety)', words: ['handover*', 'handoff*', 'SBAR'] },
   interviews: { words: ['interview*', 'focus group*', 'ethnograph*'] },
   experiences: { words: ['experienc*', 'view*', 'perception*', 'attitude*'] },
-  qualitative: { mesh: 'Qualitative Research', emtree: 'qualitative research', cinahl: 'Qualitative Studies', explode: true, words: ['qualitative', 'mixed method*'] }
+  qualitative: { mesh: 'Qualitative Research', emtree: 'qualitative research', cinahl: 'Qualitative Studies', apa: 'Qualitative Research', explode: true, words: ['qualitative', 'mixed method*'] }
 };
 function exampleText(c, db) {
   const w = c.words, phrase = x => / /.test(x);
@@ -122,9 +123,15 @@ function exampleText(c, db) {
     case 'embase': return [c.emtree ? `'${c.emtree}'/exp` : null, ...w.map(x => (phrase(x) ? `'${x}'` : x.toLowerCase()) + ':ti,ab,kw')].filter(Boolean).join(' OR ');
     case 'ovid': return [c.mesh ? (c.explode ? 'exp ' : '') + c.mesh + '/' : null, group(w, x => x) + '.ti,ab.'].filter(Boolean).join(' OR ');
     case 'ebsco': return [c.cinahl ? `(MH "${c.cinahl}${c.explode ? '+' : ''}")` : null, 'TI ' + group(w, dq), 'AB ' + group(w, dq)].filter(Boolean).join(' OR ');
+    // MEDLINE on EBSCO: the same syntax as CINAHL, with MeSH terms.
+    case 'medlineebsco': return [c.mesh ? `(MH "${c.mesh}${c.explode ? '+' : ''}")` : null, 'TI ' + group(w, dq), 'AB ' + group(w, dq)].filter(Boolean).join(' OR ');
+    // PsycINFO: .id. is Key Concepts, the author keywords of APA PsycInfo.
+    case 'psycovid': return [c.apa ? (c.explode ? 'exp ' : '') + c.apa + '/' : null, group(w, x => x) + '.ti,ab,id.'].filter(Boolean).join(' OR ');
+    case 'psycebsco': return [c.apa ? `(DE "${c.apa}")` : null, 'TI ' + group(w, dq), 'AB ' + group(w, dq)].filter(Boolean).join(' OR ');
     case 'cochrane': return [c.mesh ? `[mh ${phrase(c.mesh) ? '"' + c.mesh + '"' : c.mesh}]` : null, group(w, dq) + ':ti,ab,kw'].filter(Boolean).join(' OR ');
     case 'wos': return 'TS=(' + w.map(dq).join(' OR ') + ')';
     case 'scopus': return 'TITLE-ABS-KEY(' + w.map(dq).join(' OR ') + ')';
+    case 'europepmc': return [c.mesh ? `MESH_HEADING:"${c.mesh}"` : null, 'TITLE_ABS:' + group(w, dq)].filter(Boolean).join(' OR ');
     default: return [c.mesh ? `"${c.mesh}"[Mesh]` : null, ...w.map(x => dq(x) + '[tiab]')].filter(Boolean).join(' OR ');
   }
 }
@@ -318,10 +325,10 @@ function splitLimitLine(q) {
   return best;
 }
 // The first thesaurus term in a search: Emtree 'aged'/exp, MeSH "Aged"[Mesh], Cochrane [mh "Aged"],
-// Ovid exp Aged/, EBSCO (MH "Aged+"). Returns '' when there is none.
+// Ovid exp Aged/, EBSCO (MH "Aged+") or (DE "Aged"). Returns '' when there is none.
 function thesaurusTerm(q) {
   const res = [/'([^']+)'\/(?:exp|de|mj|syn|br)\b/i, /"([^"]+)"\s*\[(?:mesh|mh|majr)[^\]]*\]/i, /\[mh\s*\^?\s*"([^"]+)"\]/i, /\[mh\s*\^?\s*([^\]"]+)\]/i,
-    /\((?:MH|MM)\s+"([^"]+?)\+?"\)/, /(?:^|[\s(])(?:exp\s+)?\*?([A-Z][\w ,'-]*?)\/(?=[\s)]|$)/m];
+    /\((?:MH|MM|DE|MJ)\s+"([^"]+?)\+?"\)/, /(?:^|[\s(])(?:exp\s+)?\*?([A-Z][\w ,'-]*?)\/(?=[\s)]|$)/m];
   let best = null;
   res.forEach(re => { const m = re.exec(q); if (m && (!best || m.index < best.index)) best = { index: m.index, t: m[1] }; });
   return best ? best.t.trim().slice(0, 60) : '';
@@ -510,25 +517,35 @@ function parseLineSearch(text) {
 // The line-by-line example ("Load line-by-line example"), written as a search history in the syntax
 // of the chosen database: three concepts split over several lines and combined with OR, then with AND,
 // exclusions with NOT, and limits (publication type, language, year) on the last lines.
-// Web of Science and Scopus have no subject headings, so their concepts are free text only.
+// Europe PMC uses the MeSH terms of PubMed. Web of Science and Scopus have no subject headings, so their concepts are free text only; in PsycINFO only
+// the concepts with an APA Thesaurus term (apa) get a heading line.
 const LX = {
   aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*', 'older people', 'geriatric*'] },
-  rti: { mesh: 'Respiratory Tract Infections', emtree: 'respiratory tract infection', cinahl: 'Respiratory Tract Infections', explode: true, words: ['pneumonia', 'bronchiolitis'],
+  rti: { mesh: 'Respiratory Tract Infections', emtree: 'respiratory tract infection', cinahl: 'Respiratory Tract Infections', apa: 'Respiratory Tract Disorders', explode: true, words: ['pneumonia', 'bronchiolitis'],
     prox: [['respirat*', 'lung*', 'airway*'], ['infect*', 'viral*', 'bacteria*']] },
   frail: { mesh: 'Frailty', emtree: 'frailty', cinahl: 'Frailty', words: ['frail*', 'vulnerab*', 'predispos*'] },
   animals: { pubmed: '"Animals"[Mesh] NOT "Humans"[Mesh]', embase: "'animal'/exp NOT 'human'/exp", ovid: 'exp Animals/ NOT Humans/',
-    ebsco: '(MH "Animals+") NOT (MH "Human")', cochrane: '[mh Animals] NOT [mh Humans]', wos: 'TI=(mice OR mouse OR rat OR rats)', scopus: 'TITLE(mice OR mouse OR rat OR rats)' },
-  hospital: { pubmed: '"Cross Infection"[Mesh]', embase: "'hospital infection'/exp", ovid: 'exp Cross Infection/', ebsco: '(MH "Cross Infection+")',
-    cochrane: '[mh "Cross Infection"]', wos: 'TI=(nosocomial OR "hospital acquired")', scopus: 'TITLE(nosocomial OR "hospital acquired")' },
+    ebsco: '(MH "Animals+") NOT (MH "Human")', medlineebsco: '(MH "Animals+") NOT (MH "Humans")', cochrane: '[mh Animals] NOT [mh Humans]', wos: 'TI=(mice OR mouse OR rat OR rats)', scopus: 'TITLE(mice OR mouse OR rat OR rats)',
+    // PsycINFO records humans and animals in the Population field (po).
+    psycovid: 'animal.po. NOT human.po.', psycebsco: 'TI (mice OR mouse OR rat OR rats)',
+    europepmc: 'MESH_HEADING:"Animals" NOT MESH_HEADING:"Humans"' },
+  hospital: { pubmed: '"Cross Infection"[Mesh]', embase: "'hospital infection'/exp", ovid: 'exp Cross Infection/', ebsco: '(MH "Cross Infection+")', medlineebsco: '(MH "Cross Infection+")',
+    cochrane: '[mh "Cross Infection"]', wos: 'TI=(nosocomial OR "hospital acquired")', scopus: 'TITLE(nosocomial OR "hospital acquired")',
+    psycovid: '(nosocomial OR hospital acquired).ti,ab,id.', psycebsco: 'TI (nosocomial OR "hospital acquired") OR AB (nosocomial OR "hospital acquired")',
+    europepmc: 'MESH_HEADING:"Cross Infection"' },
   // Limits: [operator, text]; a database without a search field for a limit leaves it out.
   limits: {
     pubmed: [['NOT', '(case reports[pt] OR preprint[pt])'], ['AND', '(english[la] OR dutch[la])'], ['AND', '2020:2026[dp]']],
     embase: [['NOT', "('conference abstract'/it OR 'conference review'/it OR 'preprint'/it)"], ['AND', '([dutch]/lim OR [english]/lim)'], ['AND', '[2020-2026]/py']],
     ovid: [['NOT', '(case reports OR preprint).pt.'], ['AND', '(english OR dutch).lg.'], ['AND', '(2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025 OR 2026).yr.']],
     ebsco: [['NOT', 'PT ("Case Study" OR "Editorial")'], ['AND', 'LA (English OR Dutch)']],
+    medlineebsco: [['NOT', 'PT ("Case Reports" OR "Preprint")'], ['AND', 'LA (English OR Dutch)']],
+    psycovid: [['AND', '(english OR dutch).lg.'], ['AND', '(2020 OR 2021 OR 2022 OR 2023 OR 2024 OR 2025 OR 2026).yr.']],
+    psycebsco: [['AND', 'LA (English OR Dutch)']],
     cochrane: [['NOT', '"conference abstract":pt'], ['AND', '(english:la OR dutch:la)']],
     wos: [['NOT', 'DT=(Meeting Abstract OR Editorial Material)'], ['AND', 'LA=(English OR Dutch)'], ['AND', 'PY=(2020-2026)']],
-    scopus: [['NOT', 'DOCTYPE(cp OR cr)'], ['AND', 'LANGUAGE(english OR dutch)'], ['AND', 'PUBYEAR > 2019']]
+    scopus: [['NOT', 'DOCTYPE(cp OR cr)'], ['AND', 'LANGUAGE(english OR dutch)'], ['AND', 'PUBYEAR > 2019']],
+    europepmc: [['NOT', 'PUB_TYPE:("Case Reports" OR "Preprint")'], ['AND', 'LANG:(eng OR dut)'], ['AND', 'PUB_YEAR:[2020 TO 2026]']]
   }
 };
 // The lines of one concept in a database: the subject heading, a proximity line, the free-text words.
@@ -537,18 +554,23 @@ function lxConcept(c, db) {
   const ph = x => (/ /.test(x) ? "'" + x + "'" : x);
   const out = [];
   const head = { pubmed: `"${c.mesh}"[Mesh]`, embase: `'${c.emtree}'/exp`, ovid: (c.explode ? 'exp ' : '') + c.mesh + '/',
-    ebsco: `(MH "${c.cinahl}${c.explode ? '+' : ''}")`, cochrane: `[mh ${/ /.test(c.mesh) ? '"' + c.mesh + '"' : c.mesh}]` }[db];
+    ebsco: `(MH "${c.cinahl}${c.explode ? '+' : ''}")`, medlineebsco: `(MH "${c.mesh}${c.explode ? '+' : ''}")`, cochrane: `[mh ${/ /.test(c.mesh) ? '"' + c.mesh + '"' : c.mesh}]`,
+    psycovid: c.apa && (c.explode ? 'exp ' : '') + c.apa + '/', psycebsco: c.apa && `(DE "${c.apa}")`, europepmc: `MESH_HEADING:"${c.mesh}"` }[db];
   if (head) out.push(head);
   if (c.prox) {
     const [a, b] = c.prox.map(l => '(' + or(l) + ')');
     out.push({ pubmed: or(['respiratory infection', 'lung infection', 'airway infection'], x => `"${x}"[tiab:~3]`),
-      embase: `(${a} NEAR/3 ${b}):ti,ab,kw`, ovid: `(${a} adj3 ${b}).ti,ab.`, ebsco: `TI (${a} N3 ${b}) OR AB (${a} N3 ${b})`,
-      cochrane: `(${a} NEAR/3 ${b}):ti,ab,kw`, wos: `TS=(${a} NEAR/3 ${b})`, scopus: `TITLE-ABS-KEY(${a} W/3 ${b})` }[db]);
+      embase: `(${a} NEAR/3 ${b}):ti,ab,kw`, ovid: `(${a} adj3 ${b}).ti,ab.`, ebsco: `TI (${a} N3 ${b}) OR AB (${a} N3 ${b})`, medlineebsco: `TI (${a} N3 ${b}) OR AB (${a} N3 ${b})`,
+      psycovid: `(${a} adj3 ${b}).ti,ab,id.`, psycebsco: `TI (${a} N3 ${b}) OR AB (${a} N3 ${b})`,
+      cochrane: `(${a} NEAR/3 ${b}):ti,ab,kw`, wos: `TS=(${a} NEAR/3 ${b})`, scopus: `TITLE-ABS-KEY(${a} W/3 ${b})`,
+      // Europe PMC, like PubMed, only has proximity between the words of one phrase.
+      europepmc: or(['respiratory infection', 'lung infection', 'airway infection'], x => `TITLE_ABS:"${x}"~3`) }[db]);
   }
   const w = c.words;
   out.push({ pubmed: or(w, x => dq(x) + '[tiab]'), embase: or(w, x => ph(x) + ':ti,ab,kw'), ovid: '(' + or(w) + ').ti,ab.',
-    ebsco: `TI (${or(w, dq)}) OR AB (${or(w, dq)})`, cochrane: '(' + or(w, dq) + '):ti,ab,kw', wos: 'TS=(' + or(w, dq) + ')',
-    scopus: 'TITLE-ABS-KEY(' + or(w, dq) + ')' }[db]);
+    ebsco: `TI (${or(w, dq)}) OR AB (${or(w, dq)})`, medlineebsco: `TI (${or(w, dq)}) OR AB (${or(w, dq)})`, psycovid: '(' + or(w) + ').ti,ab,id.', psycebsco: `TI (${or(w, dq)}) OR AB (${or(w, dq)})`,
+    cochrane: '(' + or(w, dq) + '):ti,ab,kw', wos: 'TS=(' + or(w, dq) + ')',
+    scopus: 'TITLE-ABS-KEY(' + or(w, dq) + ')', europepmc: 'TITLE_ABS:(' + or(w, dq) + ')' }[db]);
   return out;
 }
 function linesExample(db) {
@@ -912,7 +934,7 @@ function renderEditor(root, oid, st) {
       loadDemo(st, d);
       renderEditor(root, oid, st);
       st.demo = { name: st.mn.name, db: dbOf(st).id };
-      if (!EXAMPLES[st.mn.name] && dbOf(st).id !== 'ebsco') toast('The ' + st.mn.name + ' example is written in EBSCO syntax, so ' + dbOf(st).label + ' may show warnings.');
+      if (!EXAMPLES[st.mn.name] && !['ebsco', 'medlineebsco', 'psycebsco'].includes(dbOf(st).id)) toast('The ' + st.mn.name + ' example is written in EBSCO syntax, so ' + dbOf(st).label + ' may show warnings.');
     }
     // Clear all: the text, the query title and the names of the concepts.
     if (act === 'clear') {
@@ -1453,4 +1475,15 @@ qsa(document, 'input[name="disp"]').forEach(r => r.addEventListener('change', ()
     if (u) { Object.assign(S, u.st); S.step = 'edit'; }
   }
   renderApp();
+  showWipNotice();
 })();
+
+// "Under construction" pop-up, shown every time the site opens.
+// The page never sets 'medsyntax.hideWipNotice' itself: playwright.config.js sets it so the pop-up
+// does not block clicks in the tests (playwright/framework-wip-notice.spec.ts tests the pop-up).
+function showWipNotice() {
+  const d = document.getElementById('wip-notice');
+  if (!d || typeof d.showModal !== 'function') return;
+  try { if (localStorage.getItem('medsyntax.hideWipNotice') === '1') return; } catch (e) { /* storage blocked: show it */ }
+  d.showModal();
+}

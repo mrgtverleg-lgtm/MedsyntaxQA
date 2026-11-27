@@ -169,7 +169,7 @@ test('Load multisearch example is written for the chosen database and follows a 
     await expect(page.locator('.global-ok')).toBeVisible();
     await expect(page.locator('.cbox > .warns:visible')).toHaveCount(0);
     // Switching the database rewrites the unchanged example in the new syntax.
-    for (const [db, first] of [['embase', "'aged'/exp"], ['ovid', 'exp Aged/'], ['ebsco', '(MH "Aged+")'], ['cochrane', '[mh Aged]'], ['wos', 'TS=(elderly OR "older adult*" OR "older people" OR geriatric*)'], ['scopus', 'TITLE-ABS-KEY(elderly OR "older adult*" OR "older people" OR geriatric*)']]) {
+    for (const [db, first] of [['embase', "'aged'/exp"], ['ovid', 'exp Aged/'], ['ebsco', '(MH "Aged+")'], ['medlineebsco', '(MH "Aged+")'], ['psycovid', '(elderly OR older adult* OR older people OR geriatric*).ti,ab,id.'], ['psycebsco', 'TI (elderly OR "older adult*" OR "older people" OR geriatric*) OR AB (elderly OR "older adult*" OR "older people" OR geriatric*)'], ['cochrane', '[mh Aged]'], ['wos', 'TS=(elderly OR "older adult*" OR "older people" OR geriatric*)'], ['scopus', 'TITLE-ABS-KEY(elderly OR "older adult*" OR "older people" OR geriatric*)'], ['europepmc', 'MESH_HEADING:"Aged"']]) {
         await page.locator('#f-db').selectOption(db);
         await expect(page.locator('#f-v0'), db).toHaveValue(first);
         await expect(page.locator('.global-ok'), db).toBeVisible();

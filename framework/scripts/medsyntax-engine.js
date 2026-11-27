@@ -399,16 +399,39 @@ const MS_DATABASES = [
     placeholder: "'term'/exp OR trunc*:ti,ab,kw",
     how: { field: 'write diabet*:ti,ab,kw', subject: "write 'diabetes mellitus'/exp", prox: 'write hand NEAR/3 hygiene',
            limit: 'write for example [english]/lim', wildcard: 'Embase uses * (truncation), ? (one character) and $ (zero or one character).' } },
-  { id: 'ovid', label: 'Ovid', sub: 'MEDLINE, Embase or PsycINFO via Ovid', refPrefix: '', notOp: 'NOT',
+  { id: 'ovid', label: 'Ovid', sub: 'MEDLINE or Embase via Ovid', refPrefix: '', notOp: 'NOT',
     accepts: ['ovid-field', 'ovid-heading', 'ovid-mp', 'adj'], wild: ['*', '$', '#', '?'],
     codes: new Set('ab af an au ax bt by ca cm cp cr ct cy dc dd di dj dm dp dq ds dt dv ec ed ep fs fx gs hw id in ip is jc jn jw jx kf kw la lg mp mf mh ms nm no ot pa pg ph pm ps pt px rd rn rs rw rx sh so st su sy ti tm tn tw tx ui up vo xs yr'.split(' ')),
     placeholder: 'exp Term/ OR trunc*.ti,ab.',
     how: { field: 'write diabet*.ti,ab.', subject: 'write exp Diabetes Mellitus/', prox: 'write hand adj3 hygiene',
            limit: 'use limit 1 to english language', wildcard: 'Ovid uses * or $ (truncation), # (one character) and ? (zero or one character).' } },
-  { id: 'ebsco', label: 'EBSCO', sub: 'CINAHL or MEDLINE via EBSCOhost', refPrefix: 'S', notOp: 'NOT',
+  // CINAHL and MEDLINE on EBSCOhost share the syntax, but not the thesaurus: CINAHL Subject Headings
+  // or MeSH, both written as (MH "Term+"). The id 'ebsco' stays CINAHL, so saved choices and old links still open.
+  { id: 'ebsco', label: 'CINAHL (EBSCO)', sub: 'CINAHL via EBSCOhost', refPrefix: 'S', notOp: 'NOT',
     accepts: ['ebsco-field', 'ebsco-prox'], wild: ['*', '?', '#'],
     placeholder: '(MH "Term+") OR TI trunc* OR AB trunc*',
     how: { field: 'write TI diabet* OR AB diabet*', subject: 'write (MH "Diabetes Mellitus+")', prox: 'write hand N3 hygiene',
+           limit: 'use the limiters on the search screen', wildcard: 'EBSCO uses * (truncation), ? (one character) and # (zero or one character).' } },
+  { id: 'medlineebsco', label: 'MEDLINE (EBSCO)', sub: 'MEDLINE via EBSCOhost, with MeSH headings', refPrefix: 'S', notOp: 'NOT',
+    accepts: ['ebsco-field', 'ebsco-prox'], wild: ['*', '?', '#'],
+    placeholder: '(MH "MeSH Term+") OR TI trunc* OR AB trunc*',
+    how: { field: 'write TI diabet* OR AB diabet*', subject: 'write (MH "Diabetes Mellitus+") with a MeSH term', prox: 'write hand N3 hygiene',
+           limit: 'use the limiters on the search screen', wildcard: 'EBSCO uses * (truncation), ? (one character) and # (zero or one character).' } },
+  // APA PsycInfo: the same platforms as above, but with APA Thesaurus headings and PsycINFO fields
+  // such as id (key concepts), tm (tests & measures), ag (age group), po (population), md (methodology).
+  { id: 'psycovid', label: 'PsycINFO (Ovid)', sub: 'APA PsycInfo via Ovid', refPrefix: '', notOp: 'NOT',
+    accepts: ['ovid-field', 'ovid-heading', 'ovid-mp', 'adj'], wild: ['*', '$', '#', '?'],
+    codes: new Set(('ab af ag an au bt by ca cc cm cp cq cr ct cy dc dd di dm dp ds dt ec ed fm fs hw id in ip is jn jw jx kw la lg lo md mh mp ' +
+      'no ot pg ph po ps pt pu rd rf sh so st su tc ti tm tn tw tx ug ui up vo xs yr').split(' ')),
+    placeholder: 'exp Term/ OR trunc*.ti,ab,id.',
+    how: { field: 'write anxiet*.ti,ab,id.', subject: 'write exp Anxiety/ (a term from the APA Thesaurus)', prox: 'write social adj3 anxiety',
+           limit: 'use limit 1 to english language', wildcard: 'Ovid uses * or $ (truncation), # (one character) and ? (zero or one character).' } },
+  { id: 'psycebsco', label: 'PsycINFO (EBSCO)', sub: 'APA PsycInfo via EBSCOhost', refPrefix: 'S', notOp: 'NOT',
+    accepts: ['ebsco-field', 'ebsco-prox'], wild: ['*', '?', '#'],
+    // PsycInfo has no MH/MM (those are CINAHL and MEDLINE): its subject headings are DE, major ones MJ.
+    codes: new Set('ti ab su tx kw au so pt de mj zu zt af la jn an is ib'.split(' ')),
+    placeholder: '(DE "Term") OR TI trunc* OR AB trunc*',
+    how: { field: 'write TI anxiet* OR AB anxiet*', subject: 'write DE "Anxiety"', prox: 'write social N3 anxiety',
            limit: 'use the limiters on the search screen', wildcard: 'EBSCO uses * (truncation), ? (one character) and # (zero or one character).' } },
   { id: 'cochrane', label: 'Cochrane Library', sub: 'CENTRAL and Cochrane Reviews', refPrefix: '#', notOp: 'NOT',
     accepts: ['colon-field', 'cochrane-mesh', 'near-slash', 'near-plain', 'next-plain'], wild: ['*', '?'],
@@ -433,7 +456,24 @@ const MS_DATABASES = [
       'PUBDATETXT REFARTNUM REFPAGE REFPAGEFIRST REFAUTHLASTNAME REFAUTHFIRST AUTHNAME AUTHSUFFIX').toLowerCase().split(' ')),
     placeholder: 'TITLE-ABS-KEY(trunc* OR "phrase")',
     how: { field: 'write TITLE-ABS-KEY(diabet*)', subject: 'write INDEXTERMS("diabetes mellitus")', prox: 'write hand W/3 hygiene',
-           limit: 'use the filters on the results page', wildcard: 'Scopus uses * (truncation) and ? (one character).' } }
+           limit: 'use the filters on the results page', wildcard: 'Scopus uses * (truncation) and ? (one character).' } },
+  // Europe PMC: a field name in capitals before a colon, TITLE_ABS:diabet*, MESH_HEADING:"diabetes mellitus",
+  // PUB_YEAR:[2020 TO 2026]; proximity as a phrase with ~N. The fields are the list of Europe PMC's REST API
+  // (webservices/rest/fields, checked November 2026) plus the MeSH fields, which that list leaves out.
+  { id: 'europepmc', label: 'Europe PMC', sub: 'PubMed, PMC, preprints and more', refPrefix: '#', notOp: 'NOT',
+    accepts: ['epmc-field', 'epmc-prox'], wild: ['*', '?'],
+    codes: new Set(('ABBR ABSTRACT ACCESSION_ID ACCESSION_TYPE ACK_FUND AFF ALL_FIELDS ANNOTATION_PROVIDER ANNOTATION_TYPE APPENDIX ' +
+      'AUTH AUTHORID AUTHORID_TYPE AUTHOR_ROLES AUTH_COLLECTIVE_LIST AUTH_CON AUTH_FIRST AUTH_LAST AUTH_MAN AUTH_MAN_ID BACK BACK_NOREF BODY ' +
+      'BOOK_ID CASE CHEBITERM CHEBITERM_ID CHEM CITED CITES COMP_INT CONCL CREATION_DATE DATA_AVAILABILITY DISCUSS DISEASE DISEASE_ID DOI ED ' +
+      'EMBARGO_DATE ESSN EXPERIMENTAL_METHOD EXPERIMENTAL_METHOD_ID EXT_ID E_PDATE FIG FIRST_IDATE FIRST_PDATE FT_CDATE FT_ID FUNDER_INITIATIVE ' +
+      'GENE_PROTEIN GOTERM GOTERM_ID GRANT_AGENCY GRANT_AGENCY_ID GRANT_ID HAS_ABSTRACT HAS_BOOK HAS_DATA HAS_DOI HAS_FREE_FULLTEXT HAS_FT ' +
+      'HAS_FULLTEXT HAS_PDF HAS_PREPRINT HAS_PUBLISHED_VERSION HAS_REFLIST HAS_SUPPL HAS_TM HAS_XREFS INDEX_DATE INTRO INVESTIGATOR IN_EPMC IN_PMC ' +
+      'ISBN ISSN ISSUE JOURNAL KEYWORD KW LABS_PUBS LANG LICENSE METHODS NIH_AUTH_MAN OPEN_ACCESS ORGANISM ORGANISM_ID ORG_ID OTHER PARENT_TITLE ' +
+      'PMCID PUBLISHER PUB_TYPE PUB_YEAR P_PDATE REF REFFED_BY RESOURCE_NAME RESULTS SERIES_NAME SRC SUPPL TABLE TITLE TITLE_ABS UPDATE_DATE VOLUME ' +
+      'MESH_HEADING MESH_MAJOR MESH_SUBHEADING').toLowerCase().split(' ')),
+    placeholder: 'MESH_HEADING:"Term" OR TITLE_ABS:(trunc* OR "phrase")',
+    how: { field: 'write TITLE_ABS:diabet*', subject: 'write MESH_HEADING:"diabetes mellitus"', prox: 'write TITLE_ABS:"hand hygiene"~3',
+           limit: 'write for example PUB_YEAR:[2020 TO 2026] or LANG:eng', wildcard: 'Europe PMC uses * (truncation) and ? (one character).' } }
 ];
 const msDb = id => MS_DATABASES.find(d => d.id === id) || MS_DATABASES[0];
 
@@ -443,8 +483,12 @@ const FAMILY_OWNER = {
   'ovid-mp': 'Ovid', 'ovid-field': 'Ovid', 'ovid-heading': 'Ovid', 'adj': 'Ovid', 'colon-field': 'Embase or Cochrane Library',
   'wos-tag': 'Web of Science', 'same': 'Web of Science', 'scopus-field': 'Scopus', 'scopus-prox': 'Scopus',
   'ebsco-field': 'EBSCO', 'ebsco-prox': 'EBSCO', 'near-slash': 'Embase, Cochrane Library or Web of Science',
-  'near-plain': 'Cochrane Library or Web of Science', 'next-slash': 'Embase', 'next-plain': 'Cochrane Library'
+  'near-plain': 'Cochrane Library or Web of Science', 'next-slash': 'Embase', 'next-plain': 'Cochrane Library',
+  'epmc-field': 'Europe PMC', 'epmc-prox': 'Europe PMC'
 };
+// Europe PMC fields that limit rather than search words, so the warning in another database points to its limits.
+const EPMC_LIMIT = /^(PUB_YEAR|FIRST_PDATE|P_PDATE|E_PDATE|LANG|PUB_TYPE|SRC|OPEN_ACCESS|LICENSE|HAS_\w+|IN_\w+)$/;
+const epmcKind = f => (/^MESH_/.test(f) ? 'subject' : EPMC_LIMIT.test(f) ? 'limit' : 'field');
 
 // Every piece of database-specific syntax in the (quote-masked) query: { fam, kind, pos, len, code }.
 // A span is only reported once: later families skip text an earlier family already took.
@@ -457,7 +501,10 @@ function syntaxSpans(m) {
   let rest = m;
   each(/\[([^\[\]]*)\](\/[a-z]+)?/gi, r => {
     const c = r[1].trim(), lc = c.toLowerCase();
-    if (r[2]) add('embase-limit', 'limit', r.index, r[0].length);
+    // Europe PMC range, PUB_YEAR:[2020 TO 2026]: one span with its field.
+    const epmc = !r[2] && /^\S+\s+TO\s+\S+$/.test(c) && m.slice(0, r.index).match(/(?:^|[\s(])([A-Z][A-Z0-9_]*):$/);
+    if (epmc) add('epmc-field', epmcKind(epmc[1]), r.index - epmc[1].length - 1, epmc[1].length + 1 + r[0].length, epmc[1]);
+    else if (r[2]) add('embase-limit', 'limit', r.index, r[0].length);
     else if (/^m[hj](\s+\S|\s*\^|\s*\/)/i.test(c)) add('cochrane-mesh', 'subject', r.index, r[0].length);
     else if (/^[a-z]{2,3}\s*=/i.test(c)) add('ovid-mp', 'field', r.index, r[0].length);
     else {
@@ -472,6 +519,15 @@ function syntaxSpans(m) {
   each(/(?<=[\w*?$'")])\/(exp|de|mj)\b/gi, r => add('embase-emtree', 'subject', r.index, r[0].length));
   // Other Embase codes after a quoted term or a group: 'aspirin'/tn, 'heart'/dm. The code is checked against the list.
   each(/(?<=['")])\/([a-z]{2,5})(?=[\s)]|$)/gi, r => add('embase-emtree', 'field', r.index, r[0].length, r[1]));
+  // Europe PMC: FIELD:term. A name that is not a Europe PMC field, followed by a short code (DIABETES:TI),
+  // is left to the Embase and Cochrane codes below.
+  const epmcCodes = MS_DATABASES.find(d => d.id === 'europepmc').codes;
+  each(/(?:^|(?<=[\s(]))([A-Z][A-Z0-9_]*):(?=\S)/g, r => {
+    const known = epmcCodes.has(r[1].toLowerCase());
+    if (!known && /^[a-z]{1,4}(?:,[a-z]+)*(?=[\s)]|$)/i.test(m.slice(r.index + r[0].length))) return;
+    add('epmc-field', epmcKind(r[1]), r.index, r[0].length, r[1]);
+  });
+  each(/(?<=")~\d+/g, r => add('epmc-prox', 'prox', r.index, r[0].length));
   // Every code in the list, also a short or long one after the first (ti,ab,k), so a typo is not skipped.
   // The first code has at most 4 letters, so words such as COVID-19:outcomes stay search terms.
   each(/(?<=[\w*?$'")]):([a-z]{1,4}(?:,[a-z]+)*)\b/gi, r => add('colon-field', 'field', r.index, r[0].length, r[1]));
@@ -597,7 +653,9 @@ function extraChecks(str, details, opts) {
       ? (/:~\d+\s*$/.test(sp.code)
         ? `[${sp.code}]: proximity (:~N) only works with [tiab], [ti] or [ad].`
         : `[${sp.code}] is not a PubMed field tag. Check the spelling, for example [tiab], [mh] or [pt].`)
-      : unknownCodesMsg(db, sp, text);
+      : sp.kind === 'subject' && sp.fam === 'ebsco-field'
+        ? `“${text}” is not a field code in ${db.label}. For subject headings, ${stop(db.how.subject)}`
+        : unknownCodesMsg(db, sp, text);
     addFinding(details, 'field-tag', msg, at);
   });
   // Web of Science Advanced Search needs a field tag such as TS=. Checked on the full query only.
@@ -640,9 +698,38 @@ function runMedsyntax(raw, target, opts) {
       __W.add('ambiguous-and');
     }
   }
+  if (bracketsOk) markAndParts(target);
 
   if (opts.onCommit && bracketsOk && !__W.has('quotes')) attachScopeEditor(target, opts);
   return { str, notices: cleaned.notices, warnings: WARN_ORDER.filter(k => __W.has(k)), details };
+}
+
+// A frame around each part between AND and NOT, also where there are no brackets:
+// TI=(a OR b) AND LA=(English) shows TI=(a OR b) and LA=(English) as two parts. Hovering and
+// click-to-edit then take one part, not the whole level. A level that mixes AND or NOT with OR without
+// brackets is left as it is: its order depends on the database (the ambiguous-and warning).
+// A part of one element (a single term or bracket group) gets no extra frame.
+function markAndParts(root) {
+  const isEl = (n, sel) => n.nodeType === 1 && n.matches(sel);
+  root.querySelectorAll('.search-string, .brackets').forEach(level => {
+    const kids = [...level.childNodes];
+    if (!kids.some(n => isEl(n, '.boolean.and, .boolean.not')) || kids.some(n => isEl(n, '.boolean.or'))) return;
+    let seg = [];
+    const flush = () => {
+      // Elements and loose text such as the closing dot of Ovid's .ti. (not the spaces between them).
+      const els = seg.filter(n => n.nodeType === 1 || n.textContent.trim());
+      if (els.length > 1) {
+        const from = seg.indexOf(els[0]), to = seg.indexOf(els[els.length - 1]);
+        const part = document.createElement('div');
+        part.className = 'and-part';
+        level.insertBefore(part, els[0]);
+        seg.slice(from, to + 1).forEach(n => part.appendChild(n));
+      }
+      seg = [];
+    };
+    kids.forEach(n => { if (isEl(n, '.boolean.and, .boolean.not, .bracket-open, .bracket-close, .dummy')) flush(); else seg.push(n); });
+    flush();
+  });
 }
 
 // ---- Scope-driven editor (hover, click, edit, Enter), ported and scoped per target ----

@@ -84,6 +84,28 @@ test('switching the database updates the editor', async ({ page }) => {
     await expect(page.locator('#f-db')).toHaveValue('embase');
 });
 
+// PsycINFO has its own entry per platform: APA Thesaurus headings, and the PsycINFO syntax of Ovid or EBSCO.
+// CINAHL and MEDLINE on EBSCO share the syntax but not the thesaurus: the SPIDER handover heading differs.
+// [database, subtitle, mnemonic, box, its example text]
+for (const [db, sub, mn, box, text] of [
+    ['ebsco', 'CINAHL via EBSCOhost', 'SPIDER', '#f-v1', '(MH "Hand Off (Patient Safety)") OR TI (handover* OR handoff* OR SBAR) OR AB (handover* OR handoff* OR SBAR)'],
+    ['medlineebsco', 'MEDLINE via EBSCOhost, with MeSH headings', 'SPIDER', '#f-v1', '(MH "Patient Handoff") OR TI (handover* OR handoff* OR SBAR) OR AB (handover* OR handoff* OR SBAR)'],
+    ['psycovid', 'APA PsycInfo via Ovid', 'PICO', '#f-v0', 'Type 1 Diabetes/ OR (type 1 diabetes OR T1DM).ti,ab,id.'],
+    ['psycebsco', 'APA PsycInfo via EBSCOhost', 'PICO', '#f-v0', '(DE "Type 1 Diabetes") OR TI ("type 1 diabetes" OR T1DM) OR AB ("type 1 diabetes" OR T1DM)'],
+    ['europepmc', 'PubMed, PMC, preprints and more', 'PICO', '#f-v0', 'MESH_HEADING:"Diabetes Mellitus, Type 1" OR TITLE_ABS:("type 1 diabetes" OR T1DM)'],
+]) {
+    test(`Load example in ${db} uses its own headings without warnings`, async ({ page }) => {
+        await page.goto(URL);
+        await page.locator(`.card[data-id="${mn}"]`).click();
+        await page.locator('#f-db').selectOption(db);
+        await expect(page.locator('#f-dbsub')).toHaveText(sub);
+        await page.getByRole('button', { name: 'Load example' }).click();
+        await expect(page.locator(box)).toHaveValue(text);
+        await expect(page.locator('.cbox > .warns:visible')).toHaveCount(0);
+        await expect(page.locator('.global-ok')).toBeVisible();
+    });
+}
+
 test('Start without a framework: add and remove a concept', async ({ page }) => {
     await page.goto(URL);
     await page.getByRole('button', { name: 'Start without a framework' }).click();

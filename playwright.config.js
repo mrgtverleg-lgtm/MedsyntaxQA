@@ -31,6 +31,13 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+
+    /* Hide the "under construction" pop-up of framework/ (it opens on every visit), so it does not block clicks.
+       playwright/framework-wip-notice.spec.ts clears this to test the pop-up. */
+    storageState: {
+      cookies: [],
+      origins: [{ origin: 'http://localhost:8123', localStorage: [{ name: 'medsyntax.hideWipNotice', value: '1' }] }],
+    },
   },
 
   /* Configure projects for major browsers */

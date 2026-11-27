@@ -45,6 +45,15 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
+  <dialog class="choose wip-notice" id="wip-notice" aria-labelledby="wip-notice-title" aria-describedby="wip-notice-text">
+    <h2 id="wip-notice-title"><span class="wip-crab" aria-hidden="true">🦀</span> Under construction</h2>
+    <p id="wip-notice-text">Medsyntax Framework is still under construction. Features may change or break, and links you share now may not open in later versions. Keep a copy of important searches.</p>
+    <p class="wip-report">Spotted a bug or a crustacean? Let us know on <a href="https://github.com/mrgtverleg-lgtm/MedsyntaxQA/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+    <form method="dialog" class="btn-row">
+      <button class="btn primary" id="wip-notice-ok" autofocus>I understand</button>
+    </form>
+  </dialog>
+
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
   <script src="scripts/medsyntax-engine.js"></script>
