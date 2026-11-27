@@ -101,7 +101,7 @@ function renumberConcepts(mn) {
 // exampleText() writes it in one database's syntax, so the example follows the database choice.
 const EX = {
   t1dm: { mesh: 'Diabetes Mellitus, Type 1', emtree: 'insulin dependent diabetes mellitus', cinahl: 'Diabetes Mellitus, Type 1', words: ['type 1 diabetes', 'T1DM'] },
-  diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T2DM'] },
+  diabetes: { mesh: 'Diabetes Mellitus', emtree: 'diabetes mellitus', cinahl: 'Diabetes Mellitus', explode: true, words: ['diabet*', 'T1DM'] },
   aged: { mesh: 'Aged', emtree: 'aged', cinahl: 'Aged', explode: true, words: ['elderly', 'older adult*'] },
   exercise: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity', 'resistance training'] },
   exerciseShort: { mesh: 'Exercise', emtree: 'exercise', cinahl: 'Exercise', explode: true, words: ['exercis*', 'physical activity'] },
