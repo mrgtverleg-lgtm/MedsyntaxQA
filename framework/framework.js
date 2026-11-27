@@ -641,6 +641,23 @@ const elStyle = color => `--el:${escapeHtml(color)};--el-ink:${inkFor(color)}`;
 const lettersHTML = mn => '<span class="letters" aria-hidden="true">' + mn.elements.map(e => `<span style="${elStyle(e.color)}">${escapeHtml(e.key)}</span>`).join('') + '</span>';
 const fullName = mn => mn.elements.map(e => e.label).join(' · ');
 
+// A small question with buttons, in a modal <dialog>. Resolves with the value of the chosen button,
+// or null when it is closed with Escape.
+function choose(message, buttons) {
+  return new Promise(resolve => {
+    const d = document.createElement('dialog');
+    d.className = 'choose';
+    d.innerHTML = `<p>${escText(message)}</p><div class="btn-row">${buttons.map((x, i) =>
+      `<button type="button" class="btn${x.primary ? ' primary' : ''}${x.ghost ? ' ghost' : ''}" data-i="${i}">${escapeHtml(x.label)}</button>`).join('')}</div>`;
+    let value = null;
+    d.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { value = buttons[+b.dataset.i].value; d.close(); } });
+    d.addEventListener('close', () => { d.remove(); resolve(value); });
+    document.body.appendChild(d);
+    d.showModal();
+    const first = d.querySelector('.btn.primary') || d.querySelector('button'); first && first.focus();
+  });
+}
+
 // ---------------- Editor: coloured boxes + medsyntax strategy ----------------
 function fieldHeadHTML(oid, st, e, i) {
   if (!st.mn.free) {
@@ -700,7 +717,7 @@ function showLines() { try { return localStorage.getItem(LINES_KEY) === '1'; } c
 function strategyTitle(st) {
   const t = (st.title || '').trim();
   if (t) return t;
-  return st.mn.free ? 'Medsyntax search strategy' : 'Medsyntax ' + st.mn.name + ' search strategy';
+  return st.mn.free ? 'Search strategy' : st.mn.name + ' search strategy';
 }
 
 function renderEditor(root, oid, st) {
@@ -738,18 +755,19 @@ function renderEditor(root, oid, st) {
       <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
     </section>
     <details class="extra-box viz" ${showViz() ? 'open' : ''}>
-      <summary>Medsyntax visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
+      <summary>Visualisation <span class="help">Hover a part, click it, edit, press Enter</span></summary>
       <div class="blocks"></div>
     </details>
     <details class="extra-box lines-view" ${showLines() ? 'open' : ''}>
-      <summary>Line-by-line search <span class="help">One line per concept, then lines that combine them</span></summary>
-      <div class="btn-row lines-actions">
-        <button type="button" class="btn" data-act="copy-table">Copy table</button>
-        <button type="button" class="btn" data-act="paste-table">Paste a line-by-line search…</button>
-        <button type="button" class="btn" data-act="lines-example">Load line-by-line example</button>
-      </div>
+      <summary>Multisearch <span class="help">One line per concept, then lines that combine them</span>
+        <span class="btn-row lines-actions">
+          <button type="button" class="btn small" data-act="copy-table">Copy table</button>
+          <button type="button" class="btn small" data-act="paste-table">Paste a multisearch…</button>
+          <button type="button" class="btn small" data-act="lines-example">Load multisearch example</button>
+          <button type="button" class="btn small ghost" data-act="lines-delete">Delete multisearch</button>
+        </span></summary>
       <div class="paste-box" hidden>
-        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}.</label>
+        <label for="${oid}-paste">Paste a multisearch, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}.</label>
         <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
         <p class="err" hidden></p>
         <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
@@ -880,7 +898,7 @@ function renderEditor(root, oid, st) {
       const q = compile(st); if (!q) return toast('Fill in at least one box first.');
       const name = (st.title || st.mn.name + ' search').replace(/[^\w\- ]+/g, '').trim() || 'medsyntax';
       const a = document.createElement('a');
-      const txt = (st.title ? st.title + '\n\n' : '') + 'Database: ' + dbOf(st).label + '\n\nFull query\n' + q + '\n\nLine by line\n' + linesTSV(searchLines(st)) + '\n';
+      const txt = (st.title ? st.title + '\n\n' : '') + 'Database: ' + dbOf(st).label + '\n\nFull query\n' + q + '\n\nMultisearch\n' + linesTSV(searchLines(st)) + '\n';
       a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
       a.download = name + '.txt'; document.body.appendChild(a); a.click(); a.remove();
       toast('Download started. If nothing happens, use Copy query.');
@@ -906,16 +924,34 @@ function renderEditor(root, oid, st) {
   // Paste a line-by-line search: in the paste box, or straight into an empty editor.
   const pasteBox = qs(root, '.paste-box'), pasteErr = qs(pasteBox, '.err'), linesView = qs(root, '.lines-view');
   const openPaste = () => { linesView.open = true; pasteBox.hidden = false; };
+  // The buttons sit in the section title: a click on them must not open or close the section.
   qs(root, '.lines-actions').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
+    e.preventDefault();
     if (b.dataset.act === 'copy-table') { const l = searchLines(st); if (!l.length) return toast('Fill in at least one box first.'); copyTable(l, qs(root, `#${oid}-linkbox`)); }
     if (b.dataset.act === 'paste-table') { openPaste(); qs(pasteBox, 'textarea').focus(); }
     // The example is a search history in the chosen database's syntax.
     if (b.dataset.act === 'lines-example') {
       try { localStorage.setItem(LINES_KEY, '1'); } catch (err) { /* storage blocked */ }
-      if (!loadLinesExample(st)) return toast('The line-by-line example for ' + dbOf(st).label + ' could not be read.');
+      if (!loadLinesExample(st)) return toast('The multisearch example for ' + dbOf(st).label + ' could not be read.');
       renderApp();
-      toast('Loaded a line-by-line example in ' + dbOf(st).label + ' syntax: 3 concepts, exclusions and limits.');
+      toast('Loaded a multisearch example in ' + dbOf(st).label + ' syntax: 3 concepts, exclusions and limits.');
+    }
+    // Delete the multisearch: empty every box and remove the blocks a pasted search or the example
+    // added (Limits, Exclude...). Without a framework you start again with two empty concepts.
+    // The query title and the database stay. Asks first, because it cannot be undone.
+    if (b.dataset.act === 'lines-delete') {
+      if (!searchLines(st).length && (!st.mn.free || st.mn.elements.length <= 2)) return toast('There is no multisearch to delete.');
+      choose('Delete the multisearch? This empties all boxes and cannot be undone.',
+        [{ label: 'Delete', value: 'yes', primary: true }, { label: 'Cancel', value: null, ghost: true }]).then(v => {
+        if (!v) return;
+        if (st.mn.free) st.mn = freeMnemonic(2);
+        st.values = st.mn.elements.map(() => '');
+        st.subs = st.mn.elements.map(emptySub);
+        st.demo = null; st.linesDemo = null;
+        renderApp();
+        toast('Multisearch deleted.');
+      });
     }
   });
   const readSearch = text => {
@@ -942,13 +978,14 @@ function renderEditor(root, oid, st) {
     if (empty && !readSearch(text)) return;
     // Boxes already have text (or the text could not be read): show it in the paste box first.
     openPaste(); qs(pasteBox, 'textarea').value = text;
-    pasteErr.textContent = empty ? parseLineSearch(text) : 'This looks like a line-by-line search. Click Read search to put it in the boxes; this replaces what is in them now.';
+    pasteErr.textContent = empty ? parseLineSearch(text) : 'This looks like a multisearch. Click Read search to put it in the boxes; this replaces what is in them now.';
     pasteErr.hidden = false;
     pasteBox.scrollIntoView({ block: 'nearest' });
   }));
   refresh(root, oid, st);
 }
 
+let globalOpen = false; // is the list of problems in the full query open?
 function refresh(root, oid, st) {
   latestInputTime = Date.now();
   const blocks = qs(root, '.blocks');
@@ -960,7 +997,7 @@ function refresh(root, oid, st) {
     f.className = cls;
     f.style.setProperty('--el', e.color);
     f.style.setProperty('--el-ink', inkFor(e.color));
-    f.innerHTML = `<div class="el-head"><span class="el-badge">${badge}</span><span class="warn-count" hidden></span></div>`;
+    f.innerHTML = `<div class="el-head"><span class="el-badge">${badge}</span><span class="warn-count" hidden></span></div><ul class="frame-warns" hidden></ul>`;
     return f;
   };
   const divider = (op, small) => {
@@ -969,10 +1006,12 @@ function refresh(root, oid, st) {
     d.textContent = op;
     return d;
   };
-  const showCount = (frame, n) => {
-    if (!frame || !n) return;
-    const wc = qs(frame, ':scope > .el-head .warn-count');
+  // The count in the corner of the frame, and the warnings themselves at the top of it.
+  const showWarnings = (frame, warnings) => {
+    if (!frame || !warnings.length) return;
+    const n = warnings.length, wc = qs(frame, ':scope > .el-head .warn-count'), list = qs(frame, ':scope > .frame-warns');
     wc.textContent = n === 1 ? '1 warning' : n + ' warnings'; wc.hidden = false;
+    list.innerHTML = warnings.map(w => `<li>${escText(WARN_TEXT[w])}</li>`).join(''); list.hidden = false;
   };
   st.mn.elements.forEach((e, i) => {
     const field = qs(root, `.field[data-i="${i}"]`);
@@ -1018,7 +1057,10 @@ function refresh(root, oid, st) {
       const res = runMedsyntax(raw, target, letterFrame ? {
         db: st.db,
         onCommit: v => { setBox(st, i, c.s, v); ta.value = v; refresh(root, oid, st); },
-        onCancel: () => refresh(root, oid, st)
+        onCancel: () => refresh(root, oid, st),
+        // A click outside a changed edit: keep it, throw it away, or go on editing.
+        askLeave: () => choose('You changed this part of the search. Keep the change?',
+          [{ label: 'Keep change', value: 'keep', primary: true }, { label: 'Discard', value: 'discard' }, { label: 'Keep editing', value: null, ghost: true }])
       } : { db: st.db });
       res.warnings.forEach(w => warns.add(w));
 
@@ -1031,11 +1073,11 @@ function refresh(root, oid, st) {
       if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
       warnsEl.innerHTML = res.warnings.map(w => `<li><span class="warn-head">${escText(WARN_TEXT[w])}</span>${detailHTML(res.details[w])}</li>`).join('');
       warnsEl.hidden = !res.warnings.length;
-      showCount(frame, res.warnings.length);
+      showWarnings(frame, res.warnings);
     });
     perEl.push(filled.length ? { warnings: [...warns] } : null);
   });
-  if (!shown) blocks.innerHTML = '<p class="empty">Fill in a box above to see the medsyntax visualisation.</p>';
+  if (!shown) blocks.innerHTML = '<p class="empty">Fill in a box above to see the visualisation.</p>';
 
   // Whole query: same parser, all warnings in one summary.
   const q = compile(st);
@@ -1043,18 +1085,20 @@ function refresh(root, oid, st) {
   full.textContent = q || 'The full query will be output here.';
   full.classList.toggle('empty', !q);
   const lines = searchLines(st);
-  qs(root, '.lines-wrap').innerHTML = lines.length ? linesTableHTML(lines) : '<p class="empty">Fill in a box above to see the search line by line.</p>';
+  qs(root, '.lines-wrap').innerHTML = lines.length ? linesTableHTML(lines) : '<p class="empty">Fill in a box above to see the multisearch.</p>';
   const g = qs(root, '.global');
   if (!q) { g.innerHTML = ''; }
   else {
     const gr = runMedsyntax(q, document.createElement('div'), { db: st.db, full: true });
     if (!gr.warnings.length) g.innerHTML = '<p class="global-ok">No syntax problems found in the full query</p>';
     else {
-      g.innerHTML = `<p class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</p>
+      // Closed by default: click the line to see the problems. It stays open or closed while you type.
+      g.innerHTML = `<details class="global-details" ${globalOpen ? 'open' : ''}><summary class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</summary>
         <ul class="global-list">${gr.warnings.map(w => {
           const where = st.mn.elements.filter((e, i) => perEl[i] && perEl[i].warnings.includes(w));
           return `<li>${escText(WARN_TEXT[w])}${where.length ? '<span class="letters">' + where.map(e => `<span style="${elStyle(e.color)}" title="${escapeHtml(e.label)}">${escapeHtml(e.key)}</span>`).join('') + '</span>' : ''}</li>`;
-        }).join('')}</ul>`;
+        }).join('')}</ul></details>`;
+      qs(g, '.global-details').addEventListener('toggle', e => { globalOpen = e.target.open; });
     }
   }
   syncUrl(oid, st);
@@ -1340,7 +1384,20 @@ function renderApp() {
       if (b.dataset.mng) { manageMine(st, b.dataset.mng, b.dataset.mid, body); return; }
       if (b.dataset.id) { startMnemonic(st, findMn(b.dataset.id)); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
       if (b.dataset.act === 'back') { st.step = 'edit'; st.panel = null; renderApp(); }
-      if (b.dataset.act === 'free') { if (!st.mn.free) startFree(st); st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 }); }
+      // Start without a framework: a clean slate, like the framework cards. When the boxes have text,
+      // ask first: keep it as concept blocks (a PICO letter becomes a block), or start empty.
+      if (b.dataset.act === 'free') {
+        const go = keep => {
+          if (keep) { if (!st.mn.free) startFree(st); }
+          else { st.mn = freeMnemonic(2); st.values = ['', '']; st.subs = [emptySub(), emptySub()]; st.demo = null; st.linesDemo = null; }
+          st.step = 'edit'; st.panel = null; renderApp(); window.scrollTo({ top: 0 });
+        };
+        const hasText = st.mn.elements.some((_, i) => conceptsOf(st, i).some(c => c.v.trim()));
+        if (!hasText) return go(false);
+        choose('Your search has text. Keep it as concept blocks without a framework, or start with empty concepts?',
+          [{ label: 'Keep my text', value: 'keep', primary: true }, { label: 'Start empty', value: 'empty' }, { label: 'Cancel', value: null, ghost: true }])
+          .then(v => { if (v) go(v === 'keep'); });
+      }
     };
   } else {
     const free = !!st.mn.free;

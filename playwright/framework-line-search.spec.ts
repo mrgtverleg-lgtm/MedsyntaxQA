@@ -34,19 +34,19 @@ async function openPicoEmbase(page) {
     await expect(page.locator('#f-v0')).toBeVisible();
 }
 async function pasteSearch(page, text) {
-    await page.locator('.lines-view > summary').click();
-    await page.locator('.lines-view').getByRole('button', { name: 'Paste a line-by-line search…' }).click();
+    await page.locator('.lines-view > summary').click({ position: { x: 8, y: 10 } });
+    await page.locator('.lines-view').getByRole('button', { name: 'Paste a multisearch…' }).click();
     await page.locator('#f-paste').fill(text);
     await page.getByRole('button', { name: 'Read search' }).click();
 }
 
-test('Copy table and Paste sit in the Line-by-line search section', async ({ page }) => {
+test('Copy table and Paste sit in the Multisearch section', async ({ page }) => {
     await openPicoEmbase(page);
     await expect(page.locator('.strategy').getByRole('button', { name: 'Copy table' })).toHaveCount(0);
     await expect(page.locator('.strategy .paste-box')).toHaveCount(0);
-    await page.locator('.lines-view > summary').click();
+    await page.locator('.lines-view > summary').click({ position: { x: 8, y: 10 } });
     await expect(page.locator('.lines-view').getByRole('button', { name: 'Copy table' })).toBeVisible();
-    await expect(page.locator('.lines-view').getByRole('button', { name: 'Paste a line-by-line search…' })).toBeVisible();
+    await expect(page.locator('.lines-view').getByRole('button', { name: 'Paste a multisearch…' })).toBeVisible();
 });
 
 test('Embase history with limit lines keeps the limits', async ({ page }) => {
@@ -132,7 +132,7 @@ test('Embase example from a spreadsheet gives the same search as the single stri
     await expect(page.locator('.lines-table tr.final td')).toHaveText(['#23', 'Final search', '#5 AND #12 AND #15 AND #19 NOT #22']);
     // Copying the table and pasting it back gives the same search and the same names.
     const fullBefore = await page.locator(".full-query").textContent();
-    await page.locator('.lines-view').getByRole('button', { name: 'Paste a line-by-line search…' }).click();
+    await page.locator('.lines-view').getByRole('button', { name: 'Paste a multisearch…' }).click();
     await page.locator('#f-paste').fill(await page.evaluate('linesTSV(searchLines(S))'));
     await page.getByRole('button', { name: 'Read search' }).click();
     await expect(page.locator('.full-query')).toHaveText(fullBefore || '');
@@ -154,12 +154,12 @@ test('a search without limits still fits PICO when the lines match its letters',
     await expect(page.locator('#f-v3')).toHaveValue('glucose:ti');
 });
 
-test('Load line-by-line example is written for the chosen database and follows a database switch', async ({ page }) => {
+test('Load multisearch example is written for the chosen database and follows a database switch', async ({ page }) => {
     await page.goto(URL);
     await page.locator('.card[data-id="PICO"]').click();
     await page.locator('#f-db').selectOption('pubmed');
-    await page.locator('.lines-view > summary').click();
-    await page.locator('.lines-view').getByRole('button', { name: 'Load line-by-line example' }).click();
+    await page.locator('.lines-view > summary').click({ position: { x: 8, y: 10 } });
+    await page.locator('.lines-view').getByRole('button', { name: 'Load multisearch example' }).click();
     await expect(page.locator('#f-db')).toHaveValue('pubmed');
     await expect(page.locator('.lines-view')).toHaveAttribute('open', '');
     const names = () => page.locator('.concept-name').evaluateAll(els => els.map(e => (e as HTMLInputElement).value));

@@ -120,6 +120,10 @@ main { padding-block: 20px 60px; }
 .el-badge { background: var(--el); color: var(--el-ink, #fff); font-size: .72rem; font-weight: 700; padding: 1px 8px 2px; border-radius: 4px 0 6px 0; font-family: var(--font-ui); }
 .el-frame .warn-count { font-size: .72rem; font-weight: 700; color: #8b1d1d; font-family: var(--font-ui); padding: 2px 8px 0; }
 .edit-msg { color: #8b1d1d; font-size: .8rem; font-family: var(--font-ui); display: block; padding: 2px 4px; }
+/* Warnings while editing in the Visualisation, and at the top of a frame. */
+.edit-live, .frame-warns { list-style: none; margin: 4px 0; padding: 6px 10px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); font-family: var(--font-ui); font-size: .8rem; line-height: 1.35; }
+.edit-live li + li, .frame-warns li + li { margin-top: 3px; }
+.frame-warns[hidden] { display: none; }
 html.greyscale { filter: grayscale(100%); }
 
 .global { display: grid; gap: 6px; }
@@ -127,6 +131,12 @@ html.greyscale { filter: grayscale(100%); }
 .global-bad { font-weight: 600; color: var(--warn-ink); font-size: .9rem; }
 .global-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .global-list .letters { margin-left: 6px; }
+.global-details > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 6px; }
+.global-details > summary::-webkit-details-marker { display: none; }
+.global-details > summary::before { content: "\25B8"; color: var(--warn-ink); }
+.global-details[open] > summary::before { content: "\25BE"; }
+.global-details[open] > .global-list { margin-top: 6px; }
+.global-details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .full-query { background: var(--peach); color: var(--peach-ink); padding: 10px 12px; border-radius: 6px; font-family: var(--font-code); font-size: .85rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .full-query.empty { font-family: var(--font-ui); font-style: italic; }
 .link-box input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); font-family: var(--font-code); font-size: .8rem; }
@@ -272,7 +282,9 @@ html.greyscale { filter: grayscale(100%); }
 .viz[open] > .blocks { margin-top: 8px; }
 
 /* Line-by-line search (multi-string table) and pasting one */
-.lines-view[open] > .lines-actions { margin-top: 12px; }
+/* Copy table, Paste and the example on the right of the Multisearch title. */
+.lines-view > summary .lines-actions { margin-left: auto; align-self: center; font-weight: 400; }
+.lines-view[open] > .paste-box, .lines-view[open] > .lines-wrap { margin-top: 4px; }
 .lines-wrap { overflow-x: auto; }
 .lines-wrap .empty { color: var(--muted); font-style: italic; }
 .lines-table { border-collapse: collapse; width: 100%; font-size: .85rem; }
@@ -287,3 +299,9 @@ html.greyscale { filter: grayscale(100%); }
 .paste-box { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: .88rem; }
 .paste-box[hidden] { display: none; }
 .paste-box textarea { min-height: 110px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); font-family: var(--font-code); font-size: .8rem; resize: vertical; }
+
+/* A question with buttons (choose() in framework.js). */
+dialog.choose { max-width: min(440px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; background: var(--surface); color: var(--ink); font-family: var(--font-ui); }
+dialog.choose::backdrop { background: rgb(0 0 0 / .45); }
+dialog.choose p { margin: 0 0 14px; line-height: 1.45; }
+dialog.choose .btn-row { justify-content: flex-end; }

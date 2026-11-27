@@ -686,16 +686,36 @@ function hoverMouseDown(event, target, opts) {
   $(target).find('.newInputTarget').replaceWith($ta);
   $ta.val(text.trim());
   const size = () => { $ta[0].style.height = '1px'; $ta[0].style.height = (12 + $ta[0].scrollHeight) + 'px'; };
+  let liveTimer;
   $ta.on('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); onEnterDynamicInput(target, $ta, opts); }
-    if (e.key === 'Escape') { e.preventDefault(); activeEdit = null; opts.onCancel && opts.onCancel(); }
-  }).on('input', size);
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(liveTimer); onEnterDynamicInput(target, $ta, opts); }
+    if (e.key === 'Escape') { e.preventDefault(); clearTimeout(liveTimer); activeEdit = null; opts.onCancel && opts.onCancel(); }
+  }).on('input', () => { size(); clearTimeout(liveTimer); liveTimer = setTimeout(() => liveCheck(target, $ta, opts), 250); });
   size();
-  activeEdit = { target, ta: $ta[0], cancel: opts.onCancel };
+  activeEdit = { target, ta: $ta[0], original: $ta.val(), opts, $ta };
   $ta.focus();
+}
+// The whole text of this box as it would be after the edit: the parts around it plus the edit field.
+function editedText(target, $ta) {
+  const copy = target.cloneNode(true);
+  copy.querySelectorAll('.edit-msg, .edit-live').forEach(n => n.remove());
+  const ta = copy.querySelector('.dynamic-input');
+  if (ta) ta.replaceWith(document.createTextNode(' ' + $ta.val().replace(/\n/g, ' ') + ' '));
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+}
+// Check while typing: the same checks as the box, shown right under the edit field.
+function liveCheck(target, $ta, opts) {
+  if (!$ta[0].isConnected) return;
+  const res = runMedsyntax(editedText(target, $ta), document.createElement('div'), { db: opts.db });
+  let $box = $ta.nextAll('.edit-live').first();
+  if (!res.warnings.length) { $box.remove(); return; }
+  if (!$box.length) { $box = $('<ul class="edit-live" aria-live="polite"></ul>'); $ta.after($box); }
+  $box.html(res.warnings.map(w => '<li>' + escText(WARN_TEXT[w] || w) + '</li>').join(''));
 }
 // Same checks as onEnterDynamicInput() in MedsyntaxQA; inline message instead of alert().
 function onEnterDynamicInput(target, $ta, opts) {
+  // The messages under the edit field are not part of the query.
+  $(target).find('.edit-msg, .edit-live').remove();
   const node = document.createTextNode(' ' + $ta.val().replace(/\n/g, ' ') + ' ');
   $ta.replaceWith(node);
   const str = $(target).text();
@@ -718,6 +738,20 @@ function onEnterDynamicInput(target, $ta, opts) {
   activeEdit = null;
   opts.onCommit(str.replace(/  +/g, ' ').trim());
 }
+// A click outside the edit field: without changes the edit just closes. With changes it asks first
+// (opts.askLeave resolves to 'keep', 'discard' or null for keep editing); without askLeave it keeps them.
 document.addEventListener('mousedown', function (e) {
-  if (activeEdit && !activeEdit.ta.contains(e.target)) { const c = activeEdit.cancel; activeEdit = null; c && c(); }
+  const a = activeEdit;
+  if (!a || a.asking || a.ta.contains(e.target)) return;
+  const cancel = () => { activeEdit = null; a.opts.onCancel && a.opts.onCancel(); };
+  if (a.$ta.val() === a.original) return cancel();
+  e.preventDefault(); e.stopPropagation();
+  a.asking = true;
+  Promise.resolve(a.opts.askLeave ? a.opts.askLeave() : 'keep').then(choice => {
+    a.asking = false;
+    if (activeEdit !== a) return;
+    if (choice === 'discard') cancel();
+    else if (choice === 'keep') onEnterDynamicInput(a.target, a.$ta, a.opts);
+    else a.ta.focus();
+  });
 }, true);
