@@ -252,6 +252,7 @@ const WARN_TEXT = {
   'not-op': 'Write NOT as AND NOT.',
   'op-case': 'Operator in lower case.',
   'empty-brackets': 'Empty brackets.',
+  'prox-number': 'Proximity operator without a number.',
   'wrong-db': 'Syntax from another database.',
   'field-tag': 'Unknown field tag.',
   'wildcard': 'Wildcard this database does not support.',
@@ -368,13 +369,15 @@ const PUBMED_TAGS = new Set(('ad affl affiliation all "all fields" au author aui
   'ot "other term" pa "pharmacological action" pg pagination pt "publication type" pmid uid pl "place of publication" ' +
   'pdat pubn publisher rn "ec/rn number" si "secondary source id" sh subheading subheadings tiab "title/abstract" ti title ' +
   'tw "text word" "text words" tt "transliterated title" vi volume gr "grants and funding" ps "personal name as subject" ' +
-  'pmcid mid "manuscript id" jid nlmid "nlm unique id" dsso "date - mesh"').match(/"[^"]+"|\S+/g).map(t => t.replace(/"/g, '')));
+  'pmcid mid "manuscript id" jid nlmid "nlm unique id" dsso "date - mesh" ' +
+  // Checked against pubmed.ncbi.nlm.nih.gov/help (November 2026): these were missing.
+  'aid "article identifier" epdat ppdat "mesh subheading"').match(/"[^"]+"|\S+/g).map(t => t.replace(/"/g, '')));
 function isPubmedTag(raw) {
   let t = raw.trim().toLowerCase().replace(/\s+/g, ' ');
   let m = t.match(/^(.*?):~\d+$/);                          // proximity, e.g. tiab:~3
   if (m) return ['tiab', 'ti', 'ad', 'title/abstract', 'title', 'affiliation'].includes(m[1].trim());
   m = t.match(/^(.*?):\s*noexp$/);                          // mh:noexp, majr:noexp, sh:noexp
-  if (m) return ['mh', 'mesh', 'mesh terms', 'majr', 'mesh major topic', 'sh', 'subheading'].includes(m[1].trim());
+  if (m) return ['mh', 'mesh', 'mesh terms', 'majr', 'mesh major topic', 'sh', 'subheading', 'mesh subheading', 'pt', 'publication type'].includes(m[1].trim());
   return PUBMED_TAGS.has(t);
 }
 
@@ -390,7 +393,9 @@ const MS_DATABASES = [
            limit: 'use the filters on the left of the results page', wildcard: 'PubMed only has * at the end of a word, for example diabet*.' } },
   { id: 'embase', label: 'Embase', sub: 'Embase.com', refPrefix: '#', notOp: 'NOT',
     accepts: ['colon-field', 'embase-emtree', 'embase-limit', 'near-slash', 'next-slash'], wild: ['*', '?', '$'],
-    codes: new Set('ab ad af an au ca cn co ct cy de dn dp ds dt ed ff ft ia ii ip is it jt kw la lnk lng ln mj mn oa ok pd pg pt py rn sd so ti tn tt ui vi'.split(' ')),
+    // Elsevier's list ("What field codes can I use in Embase?", checked November 2026), plus mj (major focus).
+    codes: new Set(('ab ac ad af aid an au bp ca cd cl cn ct cy dc dd de df dm dn do dtype dv ed em ff ib id ii ip is it jt kw la lc ' +
+      'lnk ls mj mn ms nc oa oc ok pd pg pii pt py rn sd sp ta ti tn tt ui vi').split(' ')),
     placeholder: "'term'/exp OR trunc*:ti,ab,kw",
     how: { field: 'write diabet*:ti,ab,kw', subject: "write 'diabetes mellitus'/exp", prox: 'write hand NEAR/3 hygiene',
            limit: 'write for example [english]/lim', wildcard: 'Embase uses * (truncation), ? (one character) and $ (zero or one character).' } },
@@ -407,7 +412,7 @@ const MS_DATABASES = [
            limit: 'use the limiters on the search screen', wildcard: 'EBSCO uses * (truncation), ? (one character) and # (zero or one character).' } },
   { id: 'cochrane', label: 'Cochrane Library', sub: 'CENTRAL and Cochrane Reviews', refPrefix: '#', notOp: 'NOT',
     accepts: ['colon-field', 'cochrane-mesh', 'near-slash', 'near-plain', 'next-plain'], wild: ['*', '?'],
-    codes: new Set('ti ab kw au so pt doi an yr'.split(' ')),
+    codes: new Set('ti ab kw au so pt doi an yr crg la'.split(' ')),
     placeholder: '[mh "Term"] OR trunc*:ti,ab,kw',
     how: { field: 'write diabet*:ti,ab,kw', subject: 'write [mh "Diabetes Mellitus"]', prox: 'write hand NEAR/3 hygiene',
            limit: 'use the filters on the results page', wildcard: 'The Cochrane Library uses * (truncation) and ? (one character).' } },
@@ -423,7 +428,9 @@ const MS_DATABASES = [
       'CASREGNUMBER CHEM CHEMNAME CODEN CONF CONFLOC CONFNAME CONFSPONSORS DOCTYPE DOI EDFIRST EDITOR EDLASTNAME EISSN EXACTSRCTITLE EXACTKEYWORD ' +
       'FIRSTAUTH FUND-SPONSOR FUND-ACR FUND-NO INDEXTERMS ISBN ISSN ISSNP ISSUE KEY LANGUAGE LIMIT-TO EXCLUDE MANUFACTURER OPENACCESS PAGEFIRST PAGELAST PAGES ' +
       'PMID PUBLISHER PUBSTAGE PUBYEAR REF REFAUTH REFTITLE REFSRCTITLE REFPUBYEAR SEQBANK SEQNUMBER SRCTITLE SRCTYPE SUBJAREA TITLE TITLE-ABS TITLE-ABS-KEY ' +
-      'TITLE-ABS-KEY-AUTH TRADENAME VOLUME WEBSITE').toLowerCase().split(' ')),
+      'TITLE-ABS-KEY-AUTH TRADENAME VOLUME WEBSITE ' +
+      // Scopus Search Guide (schema.elsevier.com, checked November 2026): these were missing.
+      'PUBDATETXT REFARTNUM REFPAGE REFPAGEFIRST REFAUTHLASTNAME REFAUTHFIRST AUTHNAME AUTHSUFFIX').toLowerCase().split(' ')),
     placeholder: 'TITLE-ABS-KEY(trunc* OR "phrase")',
     how: { field: 'write TITLE-ABS-KEY(diabet*)', subject: 'write INDEXTERMS("diabetes mellitus")', prox: 'write hand W/3 hygiene',
            limit: 'use the filters on the results page', wildcard: 'Scopus uses * (truncation) and ? (one character).' } }
@@ -461,10 +468,14 @@ function syntaxSpans(m) {
   });
   m = rest;
   // Field codes.
-  each(/(?<=[\w*$#?"')])\.([a-z]{2,3}(?:,[a-z]{2,3})*)\.(?=[\s)]|$)/gi, r => add('ovid-field', 'field', r.index, r[0].length, r[1]));
+  each(/(?<=[\w*$#?"')])\.([a-z]{1,4}(?:,[a-z]+)*)\.(?=[\s)]|$)/gi, r => add('ovid-field', 'field', r.index, r[0].length, r[1]));
   each(/(?<=[\w*?$'")])\/(exp|de|mj)\b/gi, r => add('embase-emtree', 'subject', r.index, r[0].length));
-  each(/(?<=[\w*?$'")]):([a-z]{2,4}(?:,[a-z]{2,4})*)\b/gi, r => add('colon-field', 'field', r.index, r[0].length, r[1]));
-  each(/(?:^|(?<=[\s(]))([A-Za-z]{2,4})\s*=/g, r => add('wos-tag', 'field', r.index, r[0].length, r[1]));
+  // Other Embase codes after a quoted term or a group: 'aspirin'/tn, 'heart'/dm. The code is checked against the list.
+  each(/(?<=['")])\/([a-z]{2,5})(?=[\s)]|$)/gi, r => add('embase-emtree', 'field', r.index, r[0].length, r[1]));
+  // Every code in the list, also a short or long one after the first (ti,ab,k), so a typo is not skipped.
+  // The first code has at most 4 letters, so words such as COVID-19:outcomes stay search terms.
+  each(/(?<=[\w*?$'")]):([a-z]{1,4}(?:,[a-z]+)*)\b/gi, r => add('colon-field', 'field', r.index, r[0].length, r[1]));
+  each(/(?:^|(?<=[\s(]))([A-Za-z]{1,4})\s*=/g, r => add('wos-tag', 'field', r.index, r[0].length, r[1]));
   each(/(?:^|(?<=[\s(]))(PUBYEAR)\s*[<>=]/g, r => add('scopus-field', 'field', r.index, r[1].length, r[1]));
   each(/(?:^|(?<=[\s(]))([A-Z]{3,}(?:-[A-Z]+)*)(\s*)\(/g, r => {
     if (/^(AND|OR|NOT|NEAR|NEXT|SAME)$/.test(r[1])) return;
@@ -473,6 +484,9 @@ function syntaxSpans(m) {
   });
   each(/(?:^|(?<=[\s(]))(TI|AB|SU|MH|MM|TX|KW|AU|SO|PT|DE|ZU|ZT|AF|LA|JN|MJ|MW|SH|AN|IS|IB)\s+(?!(?:AND|OR|NOT)\b)(?=["'(\w*])/g,
     r => add('ebsco-field', /^(MH|MM|DE|SU|MJ|MW|SH)$/.test(r[1]) ? 'subject' : 'field', r.index, r[1].length, r[1]));
+  // Proximity with a slash but no number (hand NEAR/ hygiene). Before the Ovid headings, which would
+  // read the slash as Heading/. In capitals or all lower case, so the Ovid heading "Vision, Near/" stays one.
+  each(/(?<=\s)(NEAR|NEXT|PRE|W|near|next|pre)\/(?=[\s)]|$)/g, r => add('prox-no-number', 'prox', r.index, r[0].length, r[1]));
   // Subject headings in Ovid: exp Heading/ and Heading/ (a slash at the end of a word).
   each(/(?:^|(?<=[\s(]))exp\s+(?=\*?[A-Za-z])/g, r => add('ovid-heading', 'subject', r.index, 3));
   each(/(?<=\w)\/(?:[a-z]{2}(?:,[a-z]{2})*)?(?=[\s)]|$)/g, r => {
@@ -500,6 +514,15 @@ function knownCode(db, sp) {
   if (sp.fam === 'pubmed-tag') return isPubmedTag(sp.code);
   if (!db.codes || !sp.code) return true;
   return sp.code.toLowerCase().split(',').every(c => db.codes.has(c.trim()));
+}
+
+// "“k” in “:ti,ab,k” is not a field code in Embase." Names the wrong code(s), not only the whole list.
+function unknownCodesMsg(db, sp, text) {
+  const codes = (sp.code || '').split(',').map(c => c.trim()).filter(Boolean);
+  const bad = db.codes ? codes.filter(c => !db.codes.has(c.toLowerCase())) : [];
+  if (!bad.length || codes.length < 2) return `“${text}” is not a field code in ${db.label}. Check the spelling, or ${stop(db.how.field)}`;
+  const list = bad.map(c => `“${c}”`).join(' and ');
+  return `${list} in “${text}” ${bad.length === 1 ? 'is not a field code' : 'are not field codes'} in ${db.label}. Check the spelling, or ${stop(db.how.field)}`;
 }
 
 // End a sentence with one full stop, also after an example such as diabet*.ti,ab.
@@ -553,6 +576,14 @@ function extraChecks(str, details, opts) {
   spans.forEach(sp => {
     const text = str.slice(sp.pos, sp.pos + sp.len).trim();
     const at = spot(str, sp.pos, sp.len);
+    if (sp.fam === 'prox-no-number') {
+      const op = sp.code.toUpperCase();
+      const slashDb = ['near-slash', 'next-slash', 'scopus-prox'].some(f => db.accepts.includes(f));
+      addFinding(details, 'prox-number', slashDb
+        ? `${op}/ needs the number of words between the terms, for example hand ${op}/3 hygiene.`
+        : `${op}/ needs the number of words between the terms. ${db.label} does not use ${op}/n: ${stop(db.how.prox)}`, at);
+      return;
+    }
     if (sp.kind === 'wildcard') {
       if (!db.wild.includes(sp.fam)) addFinding(details, 'wildcard', `“${sp.fam}” does not work in ${db.label}. ${db.how.wildcard}`, at);
       return;
@@ -566,7 +597,7 @@ function extraChecks(str, details, opts) {
       ? (/:~\d+\s*$/.test(sp.code)
         ? `[${sp.code}]: proximity (:~N) only works with [tiab], [ti] or [ad].`
         : `[${sp.code}] is not a PubMed field tag. Check the spelling, for example [tiab], [mh] or [pt].`)
-      : `“${text}” is not a field code in ${db.label}. Check the spelling, or ${stop(db.how.field)}`;
+      : unknownCodesMsg(db, sp, text);
     addFinding(details, 'field-tag', msg, at);
   });
   // Web of Science Advanced Search needs a field tag such as TS=. Checked on the full query only.
