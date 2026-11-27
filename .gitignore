@@ -10,3 +10,8 @@
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Local files, kept out of git
+.claude/settings.local.json
+embase string example.xlsx
+playwright/pubmed-examples.spec.ts
