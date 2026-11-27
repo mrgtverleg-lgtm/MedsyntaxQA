@@ -212,6 +212,8 @@ html.greyscale { filter: grayscale(100%); }
 .medsyntax-target div.double-boolean-or, .medsyntax-target div.double-boolean-and, .medsyntax-target div.lonely-bracket-open, .medsyntax-target div.lonely-bracket-close, .medsyntax-target div.lonely-square-bracket-open, .medsyntax-target div.lonely-square-bracket-close { background: darkred; color: white; padding-left: 5px; padding-right: 5px; }
 .medsyntax-target div.boolean { color: var(--color-one-dark-text); padding-left: 5px; padding-right: 5px; font-weight: bold; font-family: var(--font-serif); }
 .medsyntax-target div.brackets { padding: 1px; border-radius: 5px; border: var(--color-one-dark); border-style: solid; border-width: 3px; margin: 3px 3px 3px 3px; filter: hue-rotate(110deg); }
+/* A part from AND to AND without brackets of its own: a lighter, dashed frame. */
+.medsyntax-target div.and-part { padding: 1px 3px; border-radius: 5px; border: 2px dashed var(--color-one-dark); margin: 3px; }
 .medsyntax-target div.square-brackets { padding-right: 2px; font-family: var(--font-sans); color: var(--color-gray); }
 .medsyntax .medsyntax-target .search-string .square-brackets div { border-bottom-style: none; padding: 0px; }
 .medsyntax-target div.near { padding-left: 5px; color: var(--color-gray); font-weight: bold; font-family: var(--font-sans); }
@@ -305,3 +307,67 @@ dialog.choose { max-width: min(440px, calc(100vw - 32px)); border: 1px solid var
 dialog.choose::backdrop { background: rgb(0 0 0 / .45); }
 dialog.choose p { margin: 0 0 14px; line-height: 1.45; }
 dialog.choose .btn-row { justify-content: flex-end; }
+
+/* MeSH check (scripts/mesh-check.js): MeSH terms in the boxes are links to their NCBI MeSH record.
+   The box shows its own text; a see-through layer on top draws the underline, the icon and the click areas.
+   Status is never shown by colour alone: the line style differs too, and the hover card and status line say it in words. */
+:root { --mesh-ok: #1d6b3a; --mesh-info: #1f5fbf; --mesh-warn: #9a4a00; --mesh-err: #b3261e; --mesh-na: #5d6b6a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --mesh-ok: #79d39a; --mesh-info: #8fb8ff; --mesh-warn: #f2a65a; --mesh-err: #ff8d84; --mesh-na: #a3b3b1; }
+}
+:root[data-theme="dark"] { --mesh-ok: #79d39a; --mesh-info: #8fb8ff; --mesh-warn: #f2a65a; --mesh-err: #ff8d84; --mesh-na: #a3b3b1; }
+
+.mesh-editor { position: relative; }
+.mesh-editor > textarea { display: block; }
+.mesh-layer { position: absolute; margin: 0; overflow: hidden; pointer-events: none; color: transparent; background: transparent;
+  border-style: solid; border-color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
+.mterm { --mc: var(--mesh-info); position: relative; pointer-events: auto; cursor: pointer; border-radius: 3px;
+  text-decoration: underline solid var(--mc); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.mterm:hover { background: color-mix(in srgb, var(--mc) 14%, transparent); }
+.mterm::after { content: ""; position: absolute; right: -0.55em; top: -0.45em; width: 0.6em; height: 0.6em; background: var(--mc);
+  -webkit-mask: var(--mesh-ext) center / contain no-repeat; mask: var(--mesh-ext) center / contain no-repeat; }
+.mterm { --mesh-ext: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E"); }
+.mterm.s-found { --mc: var(--mesh-ok); }
+.mterm.s-entry { --mc: var(--mesh-info); }
+.mterm.s-replaced, .mterm.s-removed { --mc: var(--mesh-warn); text-decoration-style: double; }
+.mterm.s-notfound, .mterm.s-nonpubmed { --mc: var(--mesh-err); text-decoration-style: wavy; text-decoration-thickness: 1.5px; }
+.mterm.s-pending, .mterm.s-unavailable { --mc: var(--mesh-na); text-decoration-style: dotted; }
+.mterm.s-nonpubmed::after, .mterm.s-removed::after, .mterm.s-notfound::after { display: none; } /* no page opens: no external-link icon */
+/* Alt/Option held, or a touch screen: clicks go to the box, so the cursor can be placed in a term. */
+.mesh-alt .mterm, .mesh-touch .mterm { pointer-events: none; cursor: text; }
+
+.mico { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
+.c-found { color: var(--mesh-ok); } .c-entry { color: var(--mesh-info); } .c-replaced, .c-removed { color: var(--mesh-warn); }
+.c-notfound, .c-nonpubmed { color: var(--mesh-err); } .c-unavailable, .c-pending { color: var(--mesh-na); }
+
+.mesh-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: .84rem; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.mesh-status[hidden] { display: none; }
+.mesh-keys { color: var(--muted); font-size: .78rem; }
+.mesh-status kbd, .mesh-tip kbd { font: .75rem var(--font-code); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--surface-2); }
+.mesh-notes { display: grid; gap: 6px; }
+.mesh-notes:empty { display: none; }
+.mesh-note { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--line); border-left: 4px solid var(--mesh-na); border-radius: 6px; padding: 6px 8px; font-size: .85rem; }
+.mesh-note.n-bad { border-left-color: var(--mesh-err); }
+.mesh-note.n-warn { border-left-color: var(--mesh-warn); }
+.mesh-x { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1.15rem; line-height: 1; padding: 2px 6px; }
+.mesh-link { background: none; border: 0; padding: 0; color: var(--mesh-info); text-decoration: underline; cursor: pointer; font: inherit; font-weight: 600; }
+
+.mesh-tip { position: fixed; z-index: 40; max-width: min(380px, calc(100vw - 16px)); background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / .18); padding: 9px 11px; font-size: .84rem; line-height: 1.45; pointer-events: none; }
+.mesh-tip[hidden] { display: none; }
+.mesh-tip-row { display: flex; gap: 8px; align-items: flex-start; }
+.mesh-tip-main { font-weight: 600; }
+.mesh-tip-meta { color: var(--muted); font-size: .8rem; margin-top: 3px; }
+.mesh-tip-hint { color: var(--muted); font-size: .76rem; margin-top: 6px; }
+
+.mesh-menu { position: fixed; z-index: 41; min-width: 220px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / .18); padding: 4px; }
+.mesh-menu[hidden] { display: none; }
+.mesh-menu [role="menuitem"] { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 5px; padding: 7px 10px; cursor: pointer; font-size: .88rem; color: var(--ink); }
+.mesh-menu [role="menuitem"]:hover, .mesh-menu [role="menuitem"]:focus { background: var(--accent-soft); outline: none; }
+.mesh-menu-head { font-size: .76rem; color: var(--muted); padding: 4px 10px 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+
+
+.mesh-summary { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+.mesh-summary.bad { color: var(--warn-ink); }
+.mesh-summary[hidden] { display: none; }

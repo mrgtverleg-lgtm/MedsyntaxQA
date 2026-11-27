@@ -742,9 +742,9 @@ function renderEditor(root, oid, st) {
     </div>
     <section class="strategy">
       <div class="strategy-head"><h3 class="strategy-title">${escapeHtml(strategyTitle(st))}</h3></div>
-      <div class="global" aria-live="polite"></div>
       <h4>Full query</h4>
       <div class="full-query"></div>
+      <div class="global" aria-live="polite"></div>
       <div class="btn-row">
         <button type="button" class="btn" data-act="demo">Load example</button>
         <button type="button" class="btn primary" data-act="copy">Copy query</button>
@@ -796,6 +796,8 @@ function renderEditor(root, oid, st) {
       timer = setTimeout(() => refresh(root, oid, st), 120);
     });
   });
+  // MeSH check: MeSH terms in the boxes become links to their NCBI MeSH record (scripts/mesh-check.js).
+  if (window.MeshCheck) qsa(root, '.field textarea').forEach(ta => MeshCheck.attach(ta));
   // The database decides how the query is written and checked. Remembered in this browser.
   qs(root, `#${oid}-db`).addEventListener('change', e => {
     const from = dbOf(st).id;
@@ -1032,7 +1034,7 @@ function refresh(root, oid, st) {
       const clearBtn = c.s ? qs(box, '.clear-field') : qs(field, '.field-head .clear-field');
       clearBtn.hidden = !c.v.trim();
       const raw = c.v;
-      if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; return; }
+      if (!raw.trim()) { warnsEl.hidden = true; noticeEl.hidden = true; if (window.MeshCheck) MeshCheck.update(ta); return; }
 
       // Where the visualisation goes: straight in the letter frame, or in a sub-frame per concept.
       let target = document.createElement('div'), frame = null;
@@ -1069,6 +1071,7 @@ function refresh(root, oid, st) {
         ta.value = res.str; setBox(st, i, c.s, res.str);
         if (active) { const p = Math.min(pos + (res.str.length - raw.length), res.str.length); ta.setSelectionRange(p, p); }
       }
+      if (window.MeshCheck) MeshCheck.update(ta);
       if (res.notices.length) { noticeEl.textContent = res.notices.join(' '); noticeEl.hidden = false; } else if (noticeEl.dataset.keep !== '1') { noticeEl.hidden = true; }
       if (res.notices.length) { noticeEl.dataset.keep = '1'; setTimeout(() => { noticeEl.dataset.keep = ''; }, 6000); }
       warnsEl.innerHTML = res.warnings.map(w => `<li><span class="warn-head">${escText(WARN_TEXT[w])}</span>${detailHTML(res.details[w])}</li>`).join('');
@@ -1101,6 +1104,8 @@ function refresh(root, oid, st) {
       qs(g, '.global-details').addEventListener('toggle', e => { globalOpen = e.target.open; });
     }
   }
+  // MeSH check: one summary line under the full query.
+  if (window.MeshCheck) MeshCheck.afterRefresh(root);
   syncUrl(oid, st);
 }
 

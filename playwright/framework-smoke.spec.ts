@@ -124,3 +124,12 @@ test('Copy query puts the full query on the clipboard', async ({ page, context, 
     await expect(page.locator('#toast')).toHaveText('Query copied');
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await full.textContent());
 });
+
+test('the full query comes first, right under the search strategy heading', async ({ page }) => {
+    await openPico(page);
+    await page.locator('#f-v0').fill('diabet*[tiab]');
+    const order = await page.locator('section.strategy').evaluate(s =>
+        [...s.children].map(c => c.classList[0] || c.tagName.toLowerCase()));
+    expect(order.slice(0, 4)).toEqual(['strategy-head', 'h4', 'full-query', 'global']);
+    await expect(page.locator('section.strategy h4').first()).toHaveText(/Full query/i);
+});
