@@ -141,7 +141,7 @@ Each operator should appear **bold and grey** in the visualisation, like `NEAR/3
 | K3 | use the keyboard | Use only Tab, Enter and Space to pick a card and fill a box | You can reach every button, card and box, and see where you are | ☐ | |
 | K4 | use dark mode | Turn on dark mode on your computer and reload | The page is dark and readable; the visualisation frames stay white | ☐ | |
 | K5 | read the badges | Look at the letter badges of all cards | All letters are easy to read (dark enough colours) | ☐ | |
-| K6 | use the menu | Click **Medsyntax Editor** and **Report an issue** at the top | The Medsyntax app and the GitHub issues page of MedsyntaxQA open | ☐ | |
+| K6 | use the menu | Click **Medsyntax Editor** and **Report an issue** at the top | Medsyntax Editor opens https://www.medsyntax.org/; Report an issue opens the GitHub issues page of MedsyntaxQA | ☐ | |
 | K7 | go from the app to the framework | In the Medsyntax app: **menu** → **Medsyntax Framework** | The framework page opens | ☐ | |
 
 ---

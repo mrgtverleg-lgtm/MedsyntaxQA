@@ -28,7 +28,7 @@ From the root of the repo (not this folder), run:
 python3 -m http.server 8080
 ```
 
-Then open http://localhost:8080/framework/. The menu link *Medsyntax Editor* goes to `../`, so it only works when the whole repo is served. Opening `index.html` straight from Finder also works, apart from saving custom mnemonics in some browsers.
+Then open http://localhost:8080/framework/. The menu link *Medsyntax Editor* goes to https://www.medsyntax.org/. Opening `index.html` straight from Finder also works, apart from saving custom mnemonics in some browsers.
 
 Optional: the repo already has `scripts/lzstring.js`. You can load `../scripts/lzstring.js` instead of the cdnjs copy in `index.html`.
 
