@@ -43,13 +43,14 @@ Medsyntax is a syntax assistant for (medical) search engine queries with a scope
 - GitHub Pages deployment via `.github/workflows/static.yml`
 - Qodana code analysis config
 - `workspace/`: MedsyntaxQA (Query Augmentation) experimental version (v0.1)
+- The site's base address (`index.html`) redirects to the Medsyntax Framework (`framework/`); the Medsyntax app itself is `medsyntax-app.html`
 
 ---
 
 ## TODO
 
 ### Bugs / code questions
-- [ ] Verify the `savedLatestInputTime !== latestInputTime` check in `afterParseFunction` actually works (`index.html` TODO)
+- [ ] Verify the `savedLatestInputTime !== latestInputTime` check in `afterParseFunction` actually works (`medsyntax-app.html` TODO)
 - [ ] `scripts/key-commands.js` is a stub (only `console.log`s); implement keyboard commands or remove it
 
 ### Testing
@@ -61,7 +62,7 @@ Medsyntax is a syntax assistant for (medical) search engine queries with a scope
 - [ ] Run Playwright tests in GitHub Actions
 
 ### Code quality
-- [ ] Move inline `<script>` blocks from `index.html` into separate JS files
+- [ ] Move inline `<script>` blocks from `medsyntax-app.html` into separate JS files
 - [ ] Give generic functions clearer names (e.g. `myFunction`, `myForm`, `myRadios`)
 - [ ] Host jQuery locally or add an SRI hash to the CDN `<script>`
 - [ ] Remove or reduce commented-out `console.log` calls

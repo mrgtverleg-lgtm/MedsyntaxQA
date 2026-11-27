@@ -1,7 +1,7 @@
 // @ts-check
 import {test, expect} from '@playwright/test';
 
-let url = 'file://' + __dirname + '/../index.html';
+let url = 'file://' + __dirname + '/../medsyntax-app.html';
 
 test('Medsyntax has title', async ({page}) => {
     await page.goto(url);

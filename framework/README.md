@@ -20,6 +20,8 @@ Scripts load in this order: jQuery 3.6.0 → LZString → `scripts/medsyntax-eng
 
 See [the release checklist](../Documentatie/framework-option-b-release-checklist.md): requirements, must-fix items, tests and the steps to get this page on GitHub Pages.
 
+**Base address:** the root of the site (`index.html`) redirects to `framework/`. Old Medsyntax app links with `?query=` or `?querytitle=` go to https://www.medsyntax.org/. The old app file is kept as `medsyntax-app.html`, because the MedsyntaxQA workspace (`workspace/`) and the Playwright tests use it.
+
 ## Try it locally
 
 From the root of the repo (not this folder), run:
