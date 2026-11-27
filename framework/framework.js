@@ -186,6 +186,11 @@ function startMnemonic(st, mn) {
   st.values = st.mn.elements.map(() => '');
   st.subs = st.mn.elements.map(emptySub);
 }
+// The chosen database (step 2). Scopus writes exclusion as AND NOT; Ovid refers to lines as 1, EBSCO as S1, the rest as #1.
+const DB_KEY = 'medsyntax.database';
+function storedDb() { try { return msDb(localStorage.getItem(DB_KEY)).id; } catch (e) { return 'pubmed'; } }
+const dbOf = st => msDb(st.db);
+const opText = (st, op) => (op === 'NOT' ? dbOf(st).notOp : op);
 function compile(st) {
   const parts = [];
   st.mn.elements.forEach((e, i) => {
@@ -193,16 +198,16 @@ function compile(st) {
     // Within a letter: ((first) AND (second) OR (third)), skipping empty boxes.
     const filled = conceptsOf(st, i).filter(c => c.v.trim());
     if (!filled.length) return;
-    const inner = filled.map((c, k) => (k ? c.op + ' ' : '') + '(' + c.v.trim() + ')').join(' ');
-    parts.push((parts.length ? e.op + ' ' : '') + (filled.length > 1 ? '(' + inner + ')' : inner));
+    const inner = filled.map((c, k) => (k ? opText(st, c.op) + ' ' : '') + '(' + c.v.trim() + ')').join(' ');
+    parts.push((parts.length ? opText(st, e.op) + ' ' : '') + (filled.length > 1 ? '(' + inner + ')' : inner));
   });
   return parts.join(' ');
 }
 // Line-by-line search (multi-string): one line per filled box, a line that combines the parts of a
 // split letter, and a last line that combines the letters. Lines refer to each other as #1, #2...
 function searchLines(st) {
-  const lines = [], tops = [];
-  const add = (label, q) => { lines.push({ n: lines.length + 1, label, q }); return lines.length; };
+  const lines = [], tops = [], pre = dbOf(st).refPrefix;
+  const add = (label, q) => { lines.push({ n: lines.length + 1, ref: pre + (lines.length + 1), label, q }); return lines.length; };
   st.mn.elements.forEach((e, i) => {
     if (!e.include) return;
     const filled = conceptsOf(st, i).filter(c => c.v.trim());
@@ -210,15 +215,15 @@ function searchLines(st) {
     const head = st.mn.free ? e.label : e.key + ' · ' + e.label;
     const split = filled.length > 1;
     const refs = filled.map(c => ({ op: c.op, n: add(split ? (st.mn.free ? e.label + ' · ' : e.key + ' · ') + (c.name.trim() || 'Concept ' + (c.s + 1)) : head, c.v.trim()) }));
-    const n = split ? add(head, refs.map((r, k) => (k ? r.op + ' ' : '') + '#' + r.n).join(' ')) : refs[0].n;
+    const n = split ? add(head, refs.map((r, k) => (k ? opText(st, r.op) + ' ' : '') + pre + r.n).join(' ')) : refs[0].n;
     tops.push({ op: e.op, n });
   });
-  if (tops.length > 1) add('Combined', tops.map((t, k) => (k ? t.op + ' ' : '') + '#' + t.n).join(' '));
+  if (tops.length > 1) add('Combined', tops.map((t, k) => (k ? opText(st, t.op) + ' ' : '') + pre + t.n).join(' '));
   return lines;
 }
-const linesTSV = lines => ['#\tConcept\tSearch'].concat(lines.map(l => `#${l.n}\t${l.label}\t${l.q}`)).join('\n');
+const linesTSV = lines => ['#\tConcept\tSearch'].concat(lines.map(l => `${l.ref}\t${l.label}\t${l.q}`)).join('\n');
 const linesTableHTML = lines => '<table class="lines-table"><thead><tr><th>#</th><th>Concept</th><th>Search</th></tr></thead><tbody>' +
-  lines.map(l => `<tr><td>#${l.n}</td><td>${escapeHtml(l.label)}</td><td>${escapeHtml(l.q)}</td></tr>`).join('') + '</tbody></table>';
+  lines.map(l => `<tr><td>${escapeHtml(l.ref)}</td><td>${escapeHtml(l.label)}</td><td>${escapeHtml(l.q)}</td></tr>`).join('') + '</tbody></table>';
 // Copy as a real table (for Word and Excel), with tab-separated text as the plain version.
 function copyTable(lines, fallbackInput) {
   const tsv = linesTSV(lines);
@@ -259,6 +264,13 @@ function parseLineSearch(text) {
       if (cells.length > 1 && cells[cells.length - 2].length <= 60) name = cells[cells.length - 2];
     }
     q = q.replace(/^search:\s*/i, '').trim();
+    // Ovid combines lines as or/1-3 or and/1,4: write them out as 1 OR 2 OR 3.
+    const ov = q.match(/^(and|or)\/\s*(\d+(?:\s*[-,]\s*\d+)*)$/i);
+    if (ov) {
+      const nums = [];
+      ov[2].split(',').forEach(p => { const [a, b] = p.split('-').map(x => +x.trim()); for (let k = a; k <= (b || a) && nums.length < 200; k++) nums.push(k); });
+      q = nums.join(' ' + ov[1].toUpperCase() + ' ');
+    }
     name = name.replace(/^[^·]{1,12}·\s*/, '').trim(); // "P · Population" from our own table
     return { num: num === null ? idx + 1 : num, name, q, ref: isRefLine(q) };
   }).filter(l => l.q);
@@ -324,7 +336,7 @@ function applyLineSearch(st, parsed) {
   return fits;
 }
 function packState(oid, st) {
-  const data = { o: oid, t: st.title, n: st.mn.name, u: st.mn.useFor || '', f: st.mn.free ? 1 : 0, e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
+  const data = { o: oid, d: dbOf(st).id, t: st.title, n: st.mn.name, u: st.mn.useFor || '', f: st.mn.free ? 1 : 0, e: st.mn.elements.map(e => [e.key, e.label, e.hint || '', e.color, e.op, e.include ? 1 : 0]), v: st.values };
   if (st.subs && st.subs.some(x => x.more.length || x.name)) data.x = st.subs;
   return LZString.compressToEncodedURIComponent(JSON.stringify(data));
 }
@@ -335,12 +347,13 @@ function unpackState(s) {
     const mn = { id: 'shared:' + d.n, name: d.n || 'Shared', useFor: d.u || '', custom: true,
       elements: d.e.map(a => ({ key: a[0], label: a[1], hint: a[2], color: a[3], op: ['AND', 'OR', 'NOT'].includes(a[4]) ? a[4] : 'AND', include: !!a[5] })) };
     if (d.f) { mn.free = true; mn.id = 'none'; }
-    return { oid: d.o, st: ensureSubs({ mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '', subs: d.x }) };
+    // Links from before the database choice have no d: they were written for PubMed.
+    return { oid: d.o, st: ensureSubs({ db: msDb(d.d).id, mn, values: mn.elements.map((_, i) => (d.v && d.v[i]) || ''), title: d.t || '', subs: d.x }) };
   } catch (e) { return null; }
 }
 function buildLink(oid, st) { return location.href.split(/[?#]/)[0] + '?s=' + packState(oid, st); }
 
-const S = Object.assign(newState('PICO'), { step: 'pick', panel: null, draft: null });
+const S = Object.assign(newState('PICO'), { db: storedDb(), step: 'pick', panel: null, draft: null });
 
 // =====================================================================
 // UI helpers
@@ -390,7 +403,7 @@ function fieldHeadHTML(oid, st, e, i) {
 function conceptBoxesHTML(oid, st, e, i) {
   const free = !!st.mn.free, split = isSplit(st, i), sub = st.subs[i];
   const who = free ? (e.label || 'concept ' + e.key) : e.key; // what the buttons and labels call this letter or block
-  const placeholder = `placeholder='term OR "phrase"[Mesh] OR trunc*[tiab]'`;
+  const placeholder = `placeholder="${escapeHtml(dbOf(st).placeholder)}"`;
   const first = `
         <div class="cbox" data-s="0">
           ${split ? `<input type="text" class="sub-name" data-s="0" value="${escapeHtml(sub.name)}" placeholder="Concept 1" aria-label="Name of concept 1 of ${escapeHtml(e.key)}">` : ''}
@@ -438,6 +451,9 @@ function renderEditor(root, oid, st) {
   root.innerHTML = `
   <div class="editor">
     <div class="fields">
+      <div class="db-pick"><label for="${oid}-db">Database</label>
+        <select id="${oid}-db" aria-describedby="${oid}-dbsub">${MS_DATABASES.map(d => `<option value="${d.id}" ${d.id === dbOf(st).id ? 'selected' : ''}>${escapeHtml(d.label)}</option>`).join('')}</select>
+        <span class="db-sub" id="${oid}-dbsub">${escapeHtml(dbOf(st).sub)}</span></div>
       <label class="title-field">Query title<input type="text" id="${oid}-title" value="${escapeHtml(st.title)}" placeholder="Please input a title for your query here..."></label>
       ${st.mn.elements.map((e, i) => `
       <div class="field ${e.include ? '' : 'is-off'}" data-i="${i}" style="${elStyle(e.color)}">
@@ -466,7 +482,7 @@ function renderEditor(root, oid, st) {
       </div>
       <div class="link-box" hidden><input type="text" readonly id="${oid}-linkbox" aria-label="Link or query to copy"></div>
       <div class="paste-box" hidden>
-        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history in PubMed. Lines like <code>#1 AND #2</code> tell the tool how the lines are combined.</label>
+        <label for="${oid}-paste">Paste a line-by-line search, for example from a table in Word or Excel, or the search history of ${escapeHtml(dbOf(st).label)}. Lines like <code>#1 AND #2</code>, <code>S1 AND S2</code> or <code>or/1-3</code> tell the tool how the lines are combined.</label>
         <textarea id="${oid}-paste" spellcheck="false" placeholder="#1&#9;&quot;Diabetes Mellitus&quot;[Mesh] OR diabet*[tiab]&#10;#2&#9;exercis*[tiab]&#10;#3&#9;#1 AND #2"></textarea>
         <p class="err" hidden></p>
         <div class="btn-row"><button type="button" class="btn small primary" data-act="do-paste">Read search</button><button type="button" class="btn small ghost" data-act="cancel-paste">Cancel</button></div>
@@ -501,6 +517,13 @@ function renderEditor(root, oid, st) {
       clearTimeout(timer);
       timer = setTimeout(() => refresh(root, oid, st), 120);
     });
+  });
+  // The database decides how the query is written and checked. Remembered in this browser.
+  qs(root, `#${oid}-db`).addEventListener('change', e => {
+    st.db = msDb(e.target.value).id;
+    try { localStorage.setItem(DB_KEY, st.db); } catch (err) { /* storage blocked */ }
+    renderEditor(root, oid, st);
+    qs(root, `#${oid}-db`).focus();
   });
   qs(root, `#${oid}-title`).addEventListener('input', e => {
     st.title = e.target.value;
@@ -591,7 +614,7 @@ function renderEditor(root, oid, st) {
       const q = compile(st); if (!q) return toast('Fill in at least one box first.');
       const name = (st.title || st.mn.name + ' search').replace(/[^\w\- ]+/g, '').trim() || 'medsyntax';
       const a = document.createElement('a');
-      const txt = (st.title ? st.title + '\n\n' : '') + 'Full query\n' + q + '\n\nLine by line\n' + linesTSV(searchLines(st)) + '\n';
+      const txt = (st.title ? st.title + '\n\n' : '') + 'Database: ' + dbOf(st).label + '\n\nFull query\n' + q + '\n\nLine by line\n' + linesTSV(searchLines(st)) + '\n';
       a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
       a.download = name + '.txt'; document.body.appendChild(a); a.click(); a.remove();
       toast('Download started. If nothing happens, use Copy query.');
@@ -603,6 +626,7 @@ function renderEditor(root, oid, st) {
       st.values = st.mn.elements.map((_, i) => (typeof d[i] === 'object' ? d[i].v : d[i]) || '');
       st.subs = st.mn.elements.map((_, i) => (d[i] && typeof d[i] === 'object' ? { name: d[i].name || '', more: clone(d[i].more || []) } : emptySub()));
       renderEditor(root, oid, st);
+      if (dbOf(st).id !== 'pubmed') toast('The example is written for PubMed, so ' + dbOf(st).label + ' shows warnings. Choose PubMed to see it without them.');
     }
     // Clear all: the text, the query title and the names of the concepts.
     if (act === 'clear') {
@@ -711,9 +735,10 @@ function refresh(root, oid, st) {
         inner++;
       }
       const res = runMedsyntax(raw, target, letterFrame ? {
+        db: st.db,
         onCommit: v => { setBox(st, i, c.s, v); ta.value = v; refresh(root, oid, st); },
         onCancel: () => refresh(root, oid, st)
-      } : {});
+      } : { db: st.db });
       res.warnings.forEach(w => warns.add(w));
 
       if (res.str !== raw) {
@@ -741,7 +766,7 @@ function refresh(root, oid, st) {
   const g = qs(root, '.global');
   if (!q) { g.innerHTML = ''; }
   else {
-    const gr = runMedsyntax(q, document.createElement('div'));
+    const gr = runMedsyntax(q, document.createElement('div'), { db: st.db, full: true });
     if (!gr.warnings.length) g.innerHTML = '<p class="global-ok">No syntax problems found in the full query</p>';
     else {
       g.innerHTML = `<p class="global-bad">${gr.warnings.length} ${gr.warnings.length === 1 ? 'problem' : 'problems'} in the full query</p>

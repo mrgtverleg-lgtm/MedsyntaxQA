@@ -246,11 +246,16 @@ const WARN_TEXT = {
   'double-or': 'Duplicate OR-operators.',
   'double-and': 'Duplicate AND-operators.',
   'ambiguous-and': 'Semantically potentially unclear boolean operator(s). Not fixing these in very long strings may impact medsyntax performance.',
-  // Extra checks (Medsyntax Framework): high-priority PubMed checks and operators in a row.
+  // Extra checks (Medsyntax Framework): operators, and syntax that depends on the chosen database.
   'double-op': 'Two operators in a row.',
   'dangling-op': 'Operator without a search term before or after it.',
+  'not-op': 'Write NOT as AND NOT.',
+  'op-case': 'Operator in lower case.',
   'empty-brackets': 'Empty brackets.',
-  'pubmed-tag': 'Unknown PubMed field tag.'
+  'wrong-db': 'Syntax from another database.',
+  'field-tag': 'Unknown field tag.',
+  'wildcard': 'Wildcard this database does not support.',
+  'no-field-tag': 'No field tag: Advanced Search in Web of Science needs one, for example TS=(diabet*).'
 };
 const WARN_ORDER = Object.keys(WARN_TEXT);
 
@@ -268,12 +273,13 @@ function cleanQuery(raw) {
   const sq = str.replace(/[‘’′‵]/g, '\'');
   if (sq !== str) notices.push('Your input query included one (or some) unexpected types of single quote signs. These quote signs have been replaced with regular single quote signs.');
   str = sq;
-  str = str.replaceAll(new RegExp(/AND\(/gi), 'AND (');
-  str = str.replaceAll(new RegExp(/\)AND/gi), ') AND');
-  str = str.replaceAll(new RegExp(/\)OR/gi), ') OR');
-  str = str.replaceAll(new RegExp(/OR\(/gi), 'OR (');
-  str = str.replaceAll(new RegExp(/\)NOT/gi), ') NOT');
-  str = str.replaceAll(new RegExp(/NOT\(/gi), 'NOT (');
+  // Whole words only, so Scopus fields such as AUTHOR( and words such as )ORGANISM stay as they are.
+  str = str.replaceAll(new RegExp(/\bAND\(/gi), 'AND (');
+  str = str.replaceAll(new RegExp(/\)AND\b/gi), ') AND');
+  str = str.replaceAll(new RegExp(/\)OR\b/gi), ') OR');
+  str = str.replaceAll(new RegExp(/\bOR\(/gi), 'OR (');
+  str = str.replaceAll(new RegExp(/\)NOT\b/gi), ') NOT');
+  str = str.replaceAll(new RegExp(/\bNOT\(/gi), 'NOT (');
   return { str, notices };
 }
 
@@ -372,19 +378,160 @@ function isPubmedTag(raw) {
   return PUBMED_TAGS.has(t);
 }
 
-function extraChecks(str, details) {
+// ---- Databases (Medsyntax Framework) ----
+// Each database: how its syntax looks, which syntax families it accepts, its field codes,
+// and an example of how to write each kind of search there (used in the warnings).
+// Families: see syntaxSpans(). Kinds: field, subject, prox, limit.
+const MS_DATABASES = [
+  { id: 'pubmed', label: 'PubMed', sub: 'MEDLINE via PubMed', refPrefix: '#', notOp: 'NOT', upperOps: true,
+    accepts: ['pubmed-tag'], wild: ['*'],
+    placeholder: 'term OR "phrase"[Mesh] OR trunc*[tiab]',
+    how: { field: 'write diabet*[tiab]', subject: 'write "Diabetes Mellitus"[Mesh]', prox: 'write "hand hygiene"[tiab:~3]',
+           limit: 'use the filters on the left of the results page', wildcard: 'PubMed only has * at the end of a word, for example diabet*.' } },
+  { id: 'embase', label: 'Embase', sub: 'Embase.com', refPrefix: '#', notOp: 'NOT',
+    accepts: ['colon-field', 'embase-emtree', 'embase-limit', 'near-slash', 'next-slash'], wild: ['*', '?', '$'],
+    codes: new Set('ab ad af an au ca cn co ct cy de dn dp ds dt ed ff ft ia ii ip is it jt kw la lnk lng ln mj mn oa ok pd pg pt py rn sd so ti tn tt ui vi'.split(' ')),
+    placeholder: "'term'/exp OR trunc*:ti,ab,kw",
+    how: { field: 'write diabet*:ti,ab,kw', subject: "write 'diabetes mellitus'/exp", prox: 'write hand NEAR/3 hygiene',
+           limit: 'write for example [english]/lim', wildcard: 'Embase uses * (truncation), ? (one character) and $ (zero or one character).' } },
+  { id: 'ovid', label: 'Ovid', sub: 'MEDLINE, Embase or PsycINFO via Ovid', refPrefix: '', notOp: 'NOT',
+    accepts: ['ovid-field', 'ovid-heading', 'ovid-mp', 'adj'], wild: ['*', '$', '#', '?'],
+    codes: new Set('ab af an au ax bt by ca cm cp cr ct cy dc dd di dj dm dp dq ds dt dv ec ed ep fs fx gs hw id in ip is jc jn jw jx kf kw la lg mp mf mh ms nm no ot pa pg ph pm ps pt px rd rn rs rw rx sh so st su sy ti tm tn tw tx ui up vo xs yr'.split(' ')),
+    placeholder: 'exp Term/ OR trunc*.ti,ab.',
+    how: { field: 'write diabet*.ti,ab.', subject: 'write exp Diabetes Mellitus/', prox: 'write hand adj3 hygiene',
+           limit: 'use limit 1 to english language', wildcard: 'Ovid uses * or $ (truncation), # (one character) and ? (zero or one character).' } },
+  { id: 'ebsco', label: 'EBSCO', sub: 'CINAHL or MEDLINE via EBSCOhost', refPrefix: 'S', notOp: 'NOT',
+    accepts: ['ebsco-field', 'ebsco-prox'], wild: ['*', '?', '#'],
+    placeholder: '(MH "Term+") OR TI trunc* OR AB trunc*',
+    how: { field: 'write TI diabet* OR AB diabet*', subject: 'write (MH "Diabetes Mellitus+")', prox: 'write hand N3 hygiene',
+           limit: 'use the limiters on the search screen', wildcard: 'EBSCO uses * (truncation), ? (one character) and # (zero or one character).' } },
+  { id: 'cochrane', label: 'Cochrane Library', sub: 'CENTRAL and Cochrane Reviews', refPrefix: '#', notOp: 'NOT',
+    accepts: ['colon-field', 'cochrane-mesh', 'near-slash', 'near-plain', 'next-plain'], wild: ['*', '?'],
+    codes: new Set('ti ab kw au so pt doi an yr'.split(' ')),
+    placeholder: '[mh "Term"] OR trunc*:ti,ab,kw',
+    how: { field: 'write diabet*:ti,ab,kw', subject: 'write [mh "Diabetes Mellitus"]', prox: 'write hand NEAR/3 hygiene',
+           limit: 'use the filters on the results page', wildcard: 'The Cochrane Library uses * (truncation) and ? (one character).' } },
+  { id: 'wos', label: 'Web of Science', sub: 'Core Collection', refPrefix: '#', notOp: 'NOT', needsTag: true,
+    accepts: ['wos-tag', 'near-slash', 'near-plain', 'same'], wild: ['*', '?', '$'],
+    codes: new Set('ts ti ab ak kp au ai gp ed so do py cf ad og oo sg sa ci zp cu fo fg ft su wc is ut pmid dt publ la all'.split(' ')),
+    placeholder: 'TS=(trunc* OR "phrase")',
+    how: { field: 'write TS=(diabet*)', subject: 'Web of Science has no subject headings: search the words, for example TS=("diabetes mellitus")',
+           prox: 'write hand NEAR/3 hygiene', limit: 'use the filters on the results page', wildcard: 'Web of Science uses * (truncation), ? (one character) and $ (zero or one character).' } },
+  { id: 'scopus', label: 'Scopus', sub: '', refPrefix: '#', notOp: 'AND NOT',
+    accepts: ['scopus-field', 'scopus-prox'], wild: ['*', '?'],
+    codes: new Set(('ABS AFFIL AFFILCITY AFFILCOUNTRY AFFILORG AF-ID ALL ARTNUM AU-ID AUTH AUTHCOLLAB AUTHFIRST AUTHKEY AUTHLASTNAME AUTHOR-NAME ' +
+      'CASREGNUMBER CHEM CHEMNAME CODEN CONF CONFLOC CONFNAME CONFSPONSORS DOCTYPE DOI EDFIRST EDITOR EDLASTNAME EISSN EXACTSRCTITLE EXACTKEYWORD ' +
+      'FIRSTAUTH FUND-SPONSOR FUND-ACR FUND-NO INDEXTERMS ISBN ISSN ISSNP ISSUE KEY LANGUAGE LIMIT-TO EXCLUDE MANUFACTURER OPENACCESS PAGEFIRST PAGELAST PAGES ' +
+      'PMID PUBLISHER PUBSTAGE PUBYEAR REF REFAUTH REFTITLE REFSRCTITLE REFPUBYEAR SEQBANK SEQNUMBER SRCTITLE SRCTYPE SUBJAREA TITLE TITLE-ABS TITLE-ABS-KEY ' +
+      'TITLE-ABS-KEY-AUTH TRADENAME VOLUME WEBSITE').toLowerCase().split(' ')),
+    placeholder: 'TITLE-ABS-KEY(trunc* OR "phrase")',
+    how: { field: 'write TITLE-ABS-KEY(diabet*)', subject: 'write INDEXTERMS("diabetes mellitus")', prox: 'write hand W/3 hygiene',
+           limit: 'use the filters on the results page', wildcard: 'Scopus uses * (truncation) and ? (one character).' } }
+];
+const msDb = id => MS_DATABASES.find(d => d.id === id) || MS_DATABASES[0];
+
+// Who uses a syntax family, for "this is ... syntax" in the warning.
+const FAMILY_OWNER = {
+  'pubmed-tag': 'PubMed', 'embase-limit': 'Embase', 'embase-emtree': 'Embase', 'cochrane-mesh': 'Cochrane Library',
+  'ovid-mp': 'Ovid', 'ovid-field': 'Ovid', 'ovid-heading': 'Ovid', 'adj': 'Ovid', 'colon-field': 'Embase or Cochrane Library',
+  'wos-tag': 'Web of Science', 'same': 'Web of Science', 'scopus-field': 'Scopus', 'scopus-prox': 'Scopus',
+  'ebsco-field': 'EBSCO', 'ebsco-prox': 'EBSCO', 'near-slash': 'Embase, Cochrane Library or Web of Science',
+  'near-plain': 'Cochrane Library or Web of Science', 'next-slash': 'Embase', 'next-plain': 'Cochrane Library'
+};
+
+// Every piece of database-specific syntax in the (quote-masked) query: { fam, kind, pos, len, code }.
+// A span is only reported once: later families skip text an earlier family already took.
+function syntaxSpans(m) {
+  const out = [], taken = [];
+  const free = (p, l) => !taken.some(t => p < t[0] + t[1] && t[0] < p + l);
+  const add = (fam, kind, pos, len, code) => { if (!len || !free(pos, len)) return; taken.push([pos, len]); out.push({ fam, kind, pos, len, code }); };
+  const each = (re, fn) => { let r; re.lastIndex = 0; while ((r = re.exec(m))) { fn(r); if (!r[0].length) re.lastIndex++; } };
+  // Square brackets: PubMed tags, Cochrane [mh ...], Embase [...]/lim, and Ovid's [mp=...] history note.
+  let rest = m;
+  each(/\[([^\[\]]*)\](\/[a-z]+)?/gi, r => {
+    const c = r[1].trim(), lc = c.toLowerCase();
+    if (r[2]) add('embase-limit', 'limit', r.index, r[0].length);
+    else if (/^m[hj](\s+\S|\s*\^|\s*\/)/i.test(c)) add('cochrane-mesh', 'subject', r.index, r[0].length);
+    else if (/^[a-z]{2,3}\s*=/i.test(c)) add('ovid-mp', 'field', r.index, r[0].length);
+    else {
+      const kind = /:~\d/.test(lc) ? 'prox' : /^(mh|mesh|mesh terms|majr|mesh major topic)(:\s*noexp)?$/.test(lc) ? 'subject' : 'field';
+      add('pubmed-tag', kind, r.index, r[0].length, c);
+    }
+    rest = rest.slice(0, r.index) + ' '.repeat(r[0].length) + rest.slice(r.index + r[0].length);
+  });
+  m = rest;
+  // Field codes.
+  each(/(?<=[\w*$#?"')])\.([a-z]{2,3}(?:,[a-z]{2,3})*)\.(?=[\s)]|$)/gi, r => add('ovid-field', 'field', r.index, r[0].length, r[1]));
+  each(/(?<=[\w*?$'")])\/(exp|de|mj)\b/gi, r => add('embase-emtree', 'subject', r.index, r[0].length));
+  each(/(?<=[\w*?$'")]):([a-z]{2,4}(?:,[a-z]{2,4})*)\b/gi, r => add('colon-field', 'field', r.index, r[0].length, r[1]));
+  each(/(?:^|(?<=[\s(]))([A-Za-z]{2,4})\s*=/g, r => add('wos-tag', 'field', r.index, r[0].length, r[1]));
+  each(/(?:^|(?<=[\s(]))(PUBYEAR)\s*[<>=]/g, r => add('scopus-field', 'field', r.index, r[1].length, r[1]));
+  each(/(?:^|(?<=[\s(]))([A-Z]{3,}(?:-[A-Z]+)*)(\s*)\(/g, r => {
+    if (/^(AND|OR|NOT|NEAR|NEXT|SAME)$/.test(r[1])) return;
+    const known = MS_DATABASES.find(d => d.id === 'scopus').codes.has(r[1].toLowerCase());
+    if (known || !r[2]) add('scopus-field', 'field', r.index, r[1].length, r[1]);
+  });
+  each(/(?:^|(?<=[\s(]))(TI|AB|SU|MH|MM|TX|KW|AU|SO|PT|DE|ZU|ZT|AF|LA|JN|MJ|MW|SH|AN|IS|IB)\s+(?!(?:AND|OR|NOT)\b)(?=["'(\w*])/g,
+    r => add('ebsco-field', /^(MH|MM|DE|SU|MJ|MW|SH)$/.test(r[1]) ? 'subject' : 'field', r.index, r[1].length, r[1]));
+  // Subject headings in Ovid: exp Heading/ and Heading/ (a slash at the end of a word).
+  each(/(?:^|(?<=[\s(]))exp\s+(?=\*?[A-Za-z])/g, r => add('ovid-heading', 'subject', r.index, 3));
+  each(/(?<=\w)\/(?:[a-z]{2}(?:,[a-z]{2})*)?(?=[\s)]|$)/g, r => {
+    if (/\band$/i.test(m.slice(0, r.index)) && r[0].toLowerCase() === '/or') return; // and/or is a word
+    add('ovid-heading', 'subject', r.index, r[0].length);
+  });
+  // Proximity.
+  each(/\bNEAR\/\d+/gi, r => add('near-slash', 'prox', r.index, r[0].length));
+  each(/\bNEXT\/\d+/gi, r => add('next-slash', 'prox', r.index, r[0].length));
+  each(/\b(?:W|PRE)\/\d+/gi, r => add('scopus-prox', 'prox', r.index, r[0].length));
+  each(/\badj\d*\b/gi, r => add('adj', 'prox', r.index, r[0].length));
+  each(/(?<=\s)[NW]\d+(?=\s)/g, r => add('ebsco-prox', 'prox', r.index, r[0].length));
+  each(/\bNEAR\b(?![\/-])/g, r => add('near-plain', 'prox', r.index, r[0].length));
+  each(/\bNEXT\b(?![\/-])/g, r => add('next-plain', 'prox', r.index, r[0].length));
+  each(/\bSAME\b/g, r => add('same', 'prox', r.index, r[0].length));
+  // Wildcards (truncation with * works everywhere).
+  each(/(?<=\w)\$\d*/g, r => add('$', 'wildcard', r.index, r[0].length));
+  each(/(?<=[A-Za-z])#|#(?=[A-Za-z])/g, r => add('#', 'wildcard', r.index, 1));
+  each(/(?<=\w)\?|\?(?=\w)/g, r => add('?', 'wildcard', r.index, 1));
+  return out;
+}
+
+// Is this field code right for the database? PubMed uses its own (longer) list.
+function knownCode(db, sp) {
+  if (sp.fam === 'pubmed-tag') return isPubmedTag(sp.code);
+  if (!db.codes || !sp.code) return true;
+  return sp.code.toLowerCase().split(',').every(c => db.codes.has(c.trim()));
+}
+
+// End a sentence with one full stop, also after an example such as diabet*.ti,ab.
+const stop = t => (/\.$/.test(t) ? t : t + '.');
+
+function extraChecks(str, details, opts) {
+  opts = opts || {};
+  const db = msDb(opts.db);
   const m = maskQuotes(str);
   const OP = '(AND|OR|NOT)';
   let r;
   // Two operators in a row. "AND AND" and "OR OR" are already caught by the original parser.
+  // Scopus writes exclusion as AND NOT; the other databases as NOT.
   const dbl = new RegExp('(^|[\\s()])' + OP + '\\s+' + OP + '(?=[\\s()]|$)', 'gi');
   while ((r = dbl.exec(m))) {
     const a = r[2].toUpperCase(), b = r[3].toUpperCase();
     const pos = r.index + r[1].length, len = r[0].length - r[1].length;
-    if (!(a === b && a !== 'NOT')) {
-      addFinding(details, 'double-op', `“${a} ${b}”: use one operator.${a === 'AND' && b === 'NOT' ? ' In PubMed write a NOT b.' : ''}`, spot(str, pos, len));
+    const andNot = a === 'AND' && b === 'NOT';
+    if (!(a === b && a !== 'NOT') && !(andNot && db.notOp === 'AND NOT')) {
+      addFinding(details, 'double-op', `“${a} ${b}”: use one operator.${andNot ? ` In ${db.label} write a NOT b (Scopus uses a AND NOT b).` : ''}`, spot(str, pos, len));
     }
     dbl.lastIndex = pos + r[2].length;
+  }
+  // Scopus: NOT on its own is not an operator.
+  if (db.notOp === 'AND NOT') {
+    const lone = /(?<!\bAND\s+)(?<=^|[\s()])NOT(?=[\s(]|$)/gi;
+    while ((r = lone.exec(m))) addFinding(details, 'not-op', 'Scopus writes exclusion as a AND NOT b.', spot(str, r.index, 3));
+  }
+  // PubMed only reads AND, OR and NOT as operators when they are in capitals.
+  if (db.upperOps) {
+    const low = /(?<=\s)(and|or|not)(?=\s)/g;
+    while ((r = low.exec(m))) addFinding(details, 'op-case', `Write ${r[1].toUpperCase()} in capitals: PubMed searches a lower-case “${r[1]}” as a word.`, spot(str, r.index, r[1].length));
   }
   // Operator at the start, at the end, right after ( or right before ).
   const lead = new RegExp('(^|\\()\\s*' + OP + '(?=[\\s(]|$)', 'gi');
@@ -401,14 +548,30 @@ function extraChecks(str, details) {
   // Empty brackets.
   const empty = /\(\s*\)|\[\s*\]/g;
   while ((r = empty.exec(m))) addFinding(details, 'empty-brackets', 'Remove them or put search terms inside.', spot(str, r.index, r[0].length));
-  // Unknown PubMed field tags.
-  const tag = /\[([^\[\]]+)\]/g;
-  while ((r = tag.exec(m))) {
-    if (isPubmedTag(r[1])) continue;
-    const msg = /:~\d+\s*$/.test(r[1])
-      ? `[${r[1]}]: proximity (:~N) only works with [tiab], [ti] or [ad].`
-      : `[${r[1]}] is not a PubMed field tag. Check the spelling, for example [tiab], [mh] or [pt].`;
-    addFinding(details, 'pubmed-tag', msg, spot(str, r.index, r[0].length));
+  // Field tags, subject headings, proximity and wildcards: right for this database?
+  const spans = syntaxSpans(m);
+  spans.forEach(sp => {
+    const text = str.slice(sp.pos, sp.pos + sp.len).trim();
+    const at = spot(str, sp.pos, sp.len);
+    if (sp.kind === 'wildcard') {
+      if (!db.wild.includes(sp.fam)) addFinding(details, 'wildcard', `“${sp.fam}” does not work in ${db.label}. ${db.how.wildcard}`, at);
+      return;
+    }
+    if (!db.accepts.includes(sp.fam)) {
+      addFinding(details, 'wrong-db', `“${text}” is ${FAMILY_OWNER[sp.fam]} syntax. In ${db.label}, ${stop(db.how[sp.kind])}`, at);
+      return;
+    }
+    if (knownCode(db, sp)) return;
+    const msg = sp.fam === 'pubmed-tag'
+      ? (/:~\d+\s*$/.test(sp.code)
+        ? `[${sp.code}]: proximity (:~N) only works with [tiab], [ti] or [ad].`
+        : `[${sp.code}] is not a PubMed field tag. Check the spelling, for example [tiab], [mh] or [pt].`)
+      : `“${text}” is not a field code in ${db.label}. Check the spelling, or ${stop(db.how.field)}`;
+    addFinding(details, 'field-tag', msg, at);
+  });
+  // Web of Science Advanced Search needs a field tag such as TS=. Checked on the full query only.
+  if (opts.full && db.needsTag && !spans.some(sp => sp.fam === 'wos-tag')) {
+    addFinding(details, 'no-field-tag', 'Advanced Search in Web of Science needs a field tag, for example TS=(diabet* OR "blood glucose").', spot(str, 0, 0));
   }
 }
 
@@ -430,7 +593,7 @@ function runMedsyntax(raw, target, opts) {
   const square = bracketReport(str, '[', ']');
   bracketDetails(str, round, '(', ')', 'bracket-open', 'bracket-close', details);
   bracketDetails(str, square, '[', ']', 'square-bracket-open', 'square-bracket-close', details);
-  extraChecks(str, details);
+  extraChecks(str, details, opts);
   const bracketsOk = !round.strayOpen.length && !round.strayClose.length && !square.strayOpen.length && !square.strayClose.length;
   if (!bracketsOk) hasError = true;
 

@@ -103,6 +103,9 @@ main { padding-block: 20px 60px; }
 
 .strategy { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 14px; min-width: 0; align-content: start; }
 .strategy-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.db-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: .9rem; font-weight: 600; }
+.db-pick select { padding: 7px 10px; max-width: 100%; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.db-sub { font-weight: 400; font-size: .82rem; color: var(--muted); }
 .strategy h3 { font-size: 1.05rem; }
 .strategy h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
 .strategy .help, .extra-box .help { color: var(--muted); font-size: .82rem; font-weight: 400; }
